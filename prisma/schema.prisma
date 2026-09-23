@@ -1,0 +1,262 @@
+// Multicast data model. Single owner in v1, but every row carries workspaceId
+// so workspaces / multi-user can be added later without a data migration.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  timezone  String?
+  createdAt DateTime @default(now())
+
+  users        User[]
+  settings     Settings?
+  brandKit     BrandKit?
+  notification NotificationPref?
+}
+
+model User {
+  id           String    @id @default(cuid())
+  workspaceId  String
+  email        String    @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime  @default(now())
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Settings {
+  workspaceId     String    @id
+  claudeKeyEnc    String?
+  claudeKeyLast4  String?
+  claudeVerifiedAt DateTime?
+  draftModel      String    @default("claude-sonnet-5")
+  checkerModel    String    @default("claude-haiku-4-5-20251001")
+  creativity      String    @default("balanced") // precise | balanced | creative
+  monthlyCapCents Int?
+  // UI memory: last "Images for" selection and generator on Compose
+  lastImagePlatforms String[] @default([])
+  lastGenerator      String   @default("builtin")
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model PromptLayer {
+  id            String          @id @default(cuid())
+  workspaceId   String
+  platform      String // "brand" | "fb" | "ig" | "lip" | "lic" | "quora" | "medium" | "reddit"
+  enabled       Boolean         @default(true)
+  textPrompt    String
+  imagePrompt   String
+  rules         Json // { length, hashtags, emoji, voice, cta, variants }
+  imageDefaults Json // { sizeKey, bgHex, fgHex, generator, style, format, include{logo,sig,headline} }
+  version       Int             @default(1)
+  updatedAt     DateTime        @updatedAt
+  history       PromptVersion[]
+
+  @@unique([workspaceId, platform])
+}
+
+model PromptVersion {
+  id            String      @id @default(cuid())
+  layerId       String
+  version       Int
+  textPrompt    String
+  imagePrompt   String
+  rules         Json
+  imageDefaults Json
+  createdAt     DateTime    @default(now())
+  layer         PromptLayer @relation(fields: [layerId], references: [id], onDelete: Cascade)
+
+  @@index([layerId, version])
+}
+
+model BrandKit {
+  workspaceId    String    @id
+  logoPrimaryUrl String?
+  logoReverseUrl String?
+  logoIconUrl    String?
+  logoPosition   String    @default("tl") // tl | tr | bl | br
+  logoSize       String    @default("M") // S | M | L
+  autoReverse    Boolean   @default(true)
+  sigCompany     String?
+  sigPersonal    String?
+  sigPlacement   String    @default("opposite") // opposite | center | top
+  sigSize        String    @default("S") // S 2.5% | M 3.5% | L 4.5%
+  backgrounds    Json // [{ id, name, hex, hex2?, isDefault? }]
+  textColors     Json // [{ id, name, hex }]
+  headlineFont   String    @default("Fraunces")
+  bodyFont       String    @default("IBM Plex Sans")
+  customFonts    Json      @default("[]") // [{ family, url, weight, style }]
+  bannedPhrases  String[]  @default([])
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Integration {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  type           String // canva | figma | higgsfield | heygen | custom | slack
+  credentialsEnc String
+  last4          String?
+  status         String // connected | error
+  meta           Json?
+  verifiedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([workspaceId, type])
+}
+
+model PublishingAccount {
+  id          String    @id @default(cuid())
+  workspaceId String
+  platform    String // fb | ig | lip | lic | reddit | medium
+  tokensEnc   String
+  expiresAt   DateTime?
+  displayName String
+  status      String // connected | needs_reconnect
+  meta        Json? // page id, ig user id, member urn, org urn, reddit username, medium user id…
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([workspaceId, platform])
+}
+
+model Brief {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  text           String
+  goal           String
+  tone           String
+  link           String?
+  subreddit      String?
+  postPlatforms  String[]
+  imagePlatforms String[]
+  generator      String   @default("builtin")
+  createdAt      DateTime @default(now())
+  drafts         Draft[]
+
+  @@index([workspaceId, createdAt])
+}
+
+model Draft {
+  id              String        @id @default(cuid())
+  workspaceId     String
+  briefId         String
+  platform        String
+  hasPost         Boolean       @default(true)
+  title           String?
+  subtitle        String?
+  body            String?
+  firstComment    String?
+  hashtags        String[]      @default([])
+  variants        Json? // alternative outputs when "variants per run" > 1
+  visualBrief     Json?
+  placeholders    String[]      @default([])
+  status          String // generating | ready | warning | approved | scheduled | published | failed
+  warnings        String[]      @default([])
+  promptVersionId String?
+  model           String?
+  tokensIn        Int?
+  tokensOut       Int?
+  externalId      String?
+  externalUrl     String?
+  publishedAt     DateTime?
+  lastError       String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  brief           Brief         @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  images          ImageAsset[]
+  schedule        ScheduleItem?
+
+  @@index([workspaceId, status])
+}
+
+model ImageAsset {
+  id        String   @id @default(cuid())
+  draftId   String
+  platform  String
+  sizeKey   String
+  width     Int
+  height    Int
+  generator String // builtin | canva | figma | higgsfield | heygen | custom | upload
+  spec      Json
+  urls      String[]
+  mimeType  String   @default("image/png")
+  note      String?
+  status    String // generating | ready | approved | failed
+  warnings  String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  draft     Draft    @relation(fields: [draftId], references: [id], onDelete: Cascade)
+}
+
+model ScheduleItem {
+  id          String   @id @default(cuid())
+  workspaceId String
+  draftId     String   @unique
+  platform    String
+  runAtUtc    DateTime
+  mode        String // auto | remind
+  status      String // pending | sent | published | failed | cancelled
+  attempts    Int      @default(0)
+  externalUrl String?
+  jobId       String?
+  remindJobId String?
+  lastError   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  draft       Draft    @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, runAtUtc])
+}
+
+model PostingWindow {
+  id          String @id @default(cuid())
+  workspaceId String
+  platform    String
+  days        Int[] // 0 = Mon … 6 = Sun
+  startMin    Int // minutes after local midnight
+  endMin      Int
+
+  @@unique([workspaceId, platform])
+}
+
+model NotificationPref {
+  workspaceId String    @id
+  leadMinutes Int       @default(15) // 0 at time, 15, 60, -1 = morning of (08:00 local)
+  slack       Boolean   @default(true)
+  email       Boolean   @default(true)
+  browser     Boolean   @default(false)
+  events      String[]  @default(["ready", "published", "failed"])
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model PushSubscription {
+  id          String   @id @default(cuid())
+  workspaceId String
+  endpoint    String   @unique
+  keys        Json
+  createdAt   DateTime @default(now())
+}
+
+model UsageRecord {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  kind            String // draft | repair | image_spec | test | video_script
+  platform        String?
+  model           String
+  promptVersionId String?
+  tokensIn        Int
+  tokensOut       Int
+  costMicroUsd    Int // cost estimate in millionths of a dollar
+  createdAt       DateTime @default(now())
+
+  @@index([workspaceId, createdAt])
+}

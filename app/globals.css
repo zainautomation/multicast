@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+/* Design tokens (spec §13). Tailwind utilities are generated from @theme. */
+@theme {
+  --color-bg: #F4F1EA;
+  --color-surface: #FFFFFF;
+  --color-surface-muted: #FBFAF7;
+  --color-ink: #1B1A17;
+  --color-ink-soft: #2B2924;
+  --color-muted: #4F4B43;
+  --color-caption: #6B665C;
+  --color-line: #E2DDD2;
+  --color-input: #D6D0C3;
+  --color-divider: #EEEAE1;
+  --color-dash: #BDB6A8;
+  --color-accent: #A8461F;
+  --color-accent-hover: #7E3316;
+  --color-accent-soft: #FBF1EA;
+  --color-success: #2E6B47;
+  --color-success-soft: #E3EFE7;
+  --color-success-text: #1F4D33;
+  --color-success-line: #9CC5AB;
+  --color-warn-soft: #FBEBD9;
+  --color-warn-text: #7A3E0E;
+  --color-danger: #B42318;
+  --color-danger-text: #9B2C1F;
+  --color-side: #1B1A17;
+  --color-side-active: #34312B;
+  --color-side-card: #2A2823;
+  --color-side-text: #D9D3C7;
+  --color-side-caption: #B9B3A7;
+
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "IBM Plex Sans", "Helvetica Neue", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --radius-card: 16px;
+  --radius-ctl: 10px;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+a {
+  color: var(--color-accent);
+}
+a:hover {
+  color: var(--color-accent-hover);
+}
+
+textarea,
+input,
+select,
+button {
+  font-family: inherit;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@keyframes mc-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+.mc-pulse {
+  animation: mc-pulse 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mc-pulse { animation: none; }
+}
