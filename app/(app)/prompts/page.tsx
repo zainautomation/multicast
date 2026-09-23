@@ -1,4 +1,4 @@
-import { getCtx } from "@/lib/auth";
+import { requireCtx } from "@/lib/auth";
 import { getLayers } from "@/lib/prompts/layers";
 import { loadBrand } from "@/lib/brand";
 import { BRAND_LAYER, PLATFORM_LIST } from "@/lib/platforms";
@@ -18,7 +18,7 @@ const SUB: Record<string, string> = {
 };
 
 export default async function PromptsPage() {
-  const ctx = (await getCtx())!;
+  const ctx = await requireCtx();
   const [layers, brand, connected] = await Promise.all([getLayers(ctx.workspaceId), loadBrand(ctx.workspaceId), connectedTypes(ctx.workspaceId)]);
   const views: LayerView[] = [
     {

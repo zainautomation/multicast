@@ -1,6 +1,7 @@
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 
@@ -43,6 +44,16 @@ export async function getCtx(): Promise<Ctx | null> {
   const uid = (s as unknown as { userId?: string } | null)?.userId;
   if (!s || !ws || !uid) return null;
   return { userId: uid, workspaceId: ws, email: s.user?.email ?? "" };
+}
+
+/**
+ * For pages: the session, or a redirect to sign-in / first-run setup. Pages render in
+ * parallel with the layout, so each page must guard itself rather than rely on the layout.
+ */
+export async function requireCtx(): Promise<Ctx> {
+  const ctx = await getCtx();
+  if (ctx) return ctx;
+  redirect((await ownerExists()) ? "/login" : "/setup");
 }
 
 export async function ownerExists(): Promise<boolean> {

@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { getCtx } from "@/lib/auth";
+import { requireCtx } from "@/lib/auth";
 import { canAuto } from "@/lib/publishers";
 import { PLATFORM_LIST, PLATFORMS, type PlatformId } from "@/lib/platforms";
 import { suggestionsFor } from "@/lib/schedule/service";
@@ -20,7 +20,7 @@ function what(d: { hasPost: boolean; images: { urls: string[]; mimeType: string 
 }
 
 export default async function SchedulePage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const ctx = (await getCtx())!;
+  const ctx = await requireCtx();
   const ws = ctx.workspaceId;
   const sp = await searchParams;
   const [workspace, drafts, items, windows, pref, slack] = await Promise.all([

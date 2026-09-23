@@ -1,12 +1,12 @@
 import { db } from "@/lib/db";
-import { getCtx } from "@/lib/auth";
+import { requireCtx } from "@/lib/auth";
 import { IntegrationsClient, type ToolView } from "@/components/integrations/IntegrationsClient";
 import { appUrl } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
 export default async function IntegrationsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const ctx = (await getCtx())!;
+  const ctx = await requireCtx();
   const sp = await searchParams;
   const [rows, pref] = await Promise.all([
     db.integration.findMany({ where: { workspaceId: ctx.workspaceId } }),

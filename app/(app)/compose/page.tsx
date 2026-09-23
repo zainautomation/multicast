@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { getCtx } from "@/lib/auth";
+import { requireCtx } from "@/lib/auth";
 import { draftDTO } from "@/lib/dto";
 import { connectedTypes } from "@/lib/integrations/store";
 import { canAuto } from "@/lib/publishers";
@@ -10,7 +10,7 @@ import { ComposeClient, type PlatformTile } from "@/components/compose/ComposeCl
 export const dynamic = "force-dynamic";
 
 export default async function ComposePage({ searchParams }: { searchParams: Promise<{ brief?: string }> }) {
-  const ctx = (await getCtx())!;
+  const ctx = await requireCtx();
   const sp = await searchParams;
   const ws = ctx.workspaceId;
   const [settings, connected, layers, brief] = await Promise.all([

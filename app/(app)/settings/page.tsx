@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { getCtx } from "@/lib/auth";
+import { requireCtx } from "@/lib/auth";
 import { monthSpendMicroUsd } from "@/lib/usage";
 import { CHECKER_MODEL_OPTIONS, DRAFT_MODEL_OPTIONS, modelInfo } from "@/lib/models";
 import { SettingsClient, type AccountRow } from "@/components/settings/SettingsClient";
@@ -7,7 +7,7 @@ import { SettingsClient, type AccountRow } from "@/components/settings/SettingsC
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const ctx = (await getCtx())!;
+  const ctx = await requireCtx();
   const sp = await searchParams;
   const [s, accounts, spend, runs] = await Promise.all([
     db.settings.findUniqueOrThrow({ where: { workspaceId: ctx.workspaceId } }),
