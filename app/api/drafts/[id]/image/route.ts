@@ -33,3 +33,6 @@ export const DELETE = route<{ id: string }>(async (req, ctx, { id }) => {
   await db.imageAsset.delete({ where: { id: imageId } });
   return { draft: await loadDraftDTO(id) };
 });
+
+// Generation, rendering and publishing can take minutes (Vercel function limit).
+export const maxDuration = 300;

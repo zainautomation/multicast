@@ -2,9 +2,12 @@ import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
+import { put } from "@vercel/blob";
+import { appUrl } from "@/lib/env";
 
-// S3-compatible storage. Objects must be publicly reachable over HTTPS for Instagram.
-// Without S3_BUCKET, files go to ./storage and are served by /api/files/[...key] (dev only).
+// Storage backends, in order: S3-compatible (S3_BUCKET), Vercel Blob (BLOB_READ_WRITE_TOKEN),
+// then local ./storage served by /api/files/[...key] (development only; Vercel's disk is
+// read-only). Objects must be publicly reachable over HTTPS for Instagram.
 
 const LOCAL_ROOT = path.join(process.cwd(), "storage");
 
@@ -25,6 +28,8 @@ function client() {
 }
 
 const useS3 = () => !!process.env.S3_BUCKET;
+const useBlob = () => !useS3() && !!process.env.BLOB_READ_WRITE_TOKEN;
+const BLOB_HOST = /.public.blob.vercel-storage.com$/;
 
 export function newKey(prefix: string, ext: string) {
   const d = new Date();
@@ -38,11 +43,16 @@ export function publicUrl(key: string): string {
     const ep = (process.env.S3_ENDPOINT || `https://s3.${process.env.S3_REGION}.amazonaws.com`).replace(/\/$/, "");
     return `${ep}/${process.env.S3_BUCKET}/${key}`;
   }
-  const app = (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
+  const app = appUrl();
   return `${app}/api/files/${key}`;
 }
 
 export async function putObject(key: string, data: Buffer, contentType: string): Promise<string> {
+  if (useBlob()) {
+    const res = await put(key, data, { access: "public", contentType, addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 31536000 });
+    return res.url;
+  }
+  if (process.env.VERCEL && !useS3()) throw new Error("No file storage configured: add Vercel Blob (BLOB_READ_WRITE_TOKEN) or S3_* settings");
   if (useS3()) {
     await client().send(
       new PutObjectCommand({ Bucket: process.env.S3_BUCKET!, Key: key, Body: data, ContentType: contentType, CacheControl: "public, max-age=31536000, immutable" }),
@@ -56,6 +66,12 @@ export async function putObject(key: string, data: Buffer, contentType: string):
 }
 
 export function keyFromUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (BLOB_HOST.test(u.hostname)) return decodeURIComponent(u.pathname.slice(1));
+  } catch {
+    /* not a URL */
+  }
   const base = publicUrl("");
   if (url.startsWith(base)) return url.slice(base.length);
   const m = url.match(/\/api\/files\/(.+)$/);
@@ -64,8 +80,9 @@ export function keyFromUrl(url: string): string | null {
 
 /** Read an object we stored (by URL or key). Falls back to HTTP fetch for foreign URLs. */
 export async function readObject(urlOrKey: string): Promise<Buffer> {
-  const key = /^https?:/.test(urlOrKey) ? keyFromUrl(urlOrKey) : urlOrKey;
-  if (key) {
+  const isUrl = /^https?:/.test(urlOrKey);
+  const key = isUrl ? keyFromUrl(urlOrKey) : urlOrKey;
+  if (key && !(isUrl && BLOB_HOST.test(new URL(urlOrKey).hostname))) {
     if (useS3()) {
       const res = await client().send(new GetObjectCommand({ Bucket: process.env.S3_BUCKET!, Key: key }));
       return Buffer.from(await res.Body!.transformToByteArray());

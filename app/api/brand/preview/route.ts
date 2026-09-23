@@ -33,3 +33,6 @@ export const POST = route(async (req, ctx) => {
   });
   return { dataUrl: `data:image/png;base64,${out.images[0].toString("base64")}`, warnings: out.warnings };
 });
+
+// Generation, rendering and publishing can take minutes (Vercel function limit).
+export const maxDuration = 300;

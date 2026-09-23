@@ -5,6 +5,7 @@ import { draftBlocks, esc, postToSlack, slackConfig, type SlackBlock } from "@/l
 import { button, emailConfigured, emailLayout, escHtml, sendEmail } from "@/lib/notify/email";
 import { sendPush } from "@/lib/notify/push";
 import { errMsg } from "@/lib/util";
+import { appUrl } from "@/lib/env";
 
 export type EventKind = "ready" | "published" | "failed" | "visual" | "weekly" | "reminder";
 
@@ -19,7 +20,7 @@ export type Payloads = {
   reminder: { item: ScheduleItem; draft: DraftWithImages & { brief?: { subreddit: string | null } } };
 };
 
-const APP = () => (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
+const APP = appUrl;
 const pname = (p: string) => PLATFORMS[p as PlatformId]?.name ?? p;
 
 async function ownerEmail(workspaceId: string) {

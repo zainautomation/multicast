@@ -2,13 +2,14 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Draft, ImageAsset } from "@prisma/client";
 import { PLATFORMS, type PlatformId } from "@/lib/platforms";
 import { getIntegration } from "@/lib/integrations/store";
+import { appUrl } from "@/lib/env";
 
 // Slack: bot token (chat:write + interactivity, full Block Kit with buttons) or incoming
 // webhook (notifications only, one channel). Section text is capped at 3,000 chars.
 
 export type SlackBlock = Record<string, unknown>;
 
-const APP = () => (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
+const APP = appUrl;
 
 function chunks(text: string, size = 2900): string[] {
   const out: string[] = [];

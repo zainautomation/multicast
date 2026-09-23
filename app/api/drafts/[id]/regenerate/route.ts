@@ -11,3 +11,6 @@ export const POST = route<{ id: string }>(async (_req, ctx, { id }) => {
   if (["scheduled", "published"].includes(d.status)) throw new HttpError(400, "Unschedule this post before regenerating it.");
   return { draft: await regenerateText(ctx.workspaceId, id) };
 });
+
+// Generation, rendering and publishing can take minutes (Vercel function limit).
+export const maxDuration = 300;

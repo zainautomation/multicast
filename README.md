@@ -21,6 +21,20 @@ Then open **Claude API & accounts**, paste your Claude API key and press **Test 
 
 Production: `npm run build && npm start`, plus `npm run worker` as a separate long-running process.
 
+## Deploying to Vercel
+
+1. **Import** the GitHub repo in Vercel (New Project → `zainautomation/multicast`). The `vercel-build` script runs `prisma generate`, applies migrations and builds.
+2. **Add storage** from the project's Storage tab (Marketplace):
+   - **Neon** (Postgres) → sets `DATABASE_URL`
+   - **Vercel Blob** → sets `BLOB_READ_WRITE_TOKEN`. Vercel's disk is read-only, so uploads and images need this or `S3_*`
+   - **Upstash Redis** → copy its `rediss://` URL into `REDIS_URL` (only needed for scheduling)
+3. **Environment variables:** `ENCRYPTION_KEY` (`npm run gen:key`) and `NEXTAUTH_SECRET` are required. `APP_URL` and `NEXTAUTH_URL` default to the Vercel production URL; set them if you use a custom domain. Add the OAuth app variables as you connect platforms.
+4. **Deploy**, open the site, and create the owner account at `/setup`.
+
+**The scheduler worker does not run on Vercel.** Vercel functions are request-scoped, and BullMQ needs an always-on process. Scheduled auto-posts and reminders need `npm run worker` running somewhere with the same `DATABASE_URL`, `REDIS_URL`, `ENCRYPTION_KEY` and storage variables: Railway, Render, Fly.io or any small VM. Everything else works on Vercel alone, including Compose, Post now, prompts, the brand kit, integrations and Slack buttons.
+
+**Function time limit:** generation routes set `maxDuration = 300`. HeyGen videos that take longer than about 5 minutes to render will time out on Vercel.
+
 ## What needs what
 
 | Feature | Needs |

@@ -12,3 +12,6 @@ export const POST = route<{ layer: string }>(async (req, ctx, { layer }) => {
   const p = await body(req, z.object({ textPrompt: z.string().max(20_000).optional(), rules: RulesPatch.optional() }));
   return testPrompt(ctx.workspaceId, layer as PlatformId | "brand", p);
 });
+
+// Generation, rendering and publishing can take minutes (Vercel function limit).
+export const maxDuration = 300;

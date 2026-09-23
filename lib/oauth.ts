@@ -7,6 +7,7 @@ import { GRAPH } from "@/lib/publishers/meta";
 import { saveAccount } from "@/lib/publishers/accounts";
 import { liHeaders } from "@/lib/publishers/linkedin";
 import { saveIntegration } from "@/lib/integrations/store";
+import { appUrl } from "@/lib/env";
 
 // OAuth for publishing accounts (Meta, LinkedIn, Reddit) and Canva. The `state` value and
 // (for Canva) the PKCE verifier live in a short-lived httpOnly cookie and must match on return.
@@ -14,7 +15,7 @@ import { saveIntegration } from "@/lib/integrations/store";
 export const PROVIDERS = ["meta", "linkedin", "reddit", "canva"] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
-const APP = () => (process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "");
+const APP = appUrl;
 export const redirectUri = (p: Provider) => `${APP()}/api/oauth/${p}/callback`;
 const cookieName = (p: Provider) => `mc_oauth_${p}`;
 

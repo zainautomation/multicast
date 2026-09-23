@@ -3,6 +3,7 @@ import { ZodError, type ZodType } from "zod";
 import { getCtx, type Ctx } from "@/lib/auth";
 
 import { HttpError } from "@/lib/errors";
+import { appUrl } from "@/lib/env";
 
 export { HttpError };
 
@@ -18,7 +19,7 @@ function checkSameOrigin(req: NextRequest) {
   const method = req.method.toUpperCase();
   if (method === "GET" || method === "HEAD" || method === "OPTIONS") return;
   const allowed = new Set<string>([req.nextUrl.origin]);
-  if (process.env.APP_URL) allowed.add(new URL(process.env.APP_URL).origin);
+  allowed.add(new URL(appUrl()).origin);
   const origin = req.headers.get("origin");
   if (origin) {
     if (!allowed.has(origin)) throw new HttpError(403, "Cross-origin request blocked");

@@ -116,3 +116,6 @@ export const POST = route(async (req, ctx) => {
   });
   return new Response(stream, { headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" } });
 });
+
+// Generation, rendering and publishing can take minutes (Vercel function limit).
+export const maxDuration = 300;

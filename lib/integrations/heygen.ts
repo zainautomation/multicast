@@ -1,4 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { after } from "next/server";
 import { db } from "@/lib/db";
 import { callTool, clientFor } from "@/lib/claude";
 import { recordUsage, assertUnderCap } from "@/lib/usage";
@@ -41,7 +42,8 @@ export async function startAvatarVideo(workspaceId: string, draftId: string): Pr
     data: { draftId, platform: d.platform, sizeKey: `${dim.width}x${dim.height}`, width: dim.width, height: dim.height, generator: "heygen", spec: {}, urls: [], mimeType: "video/mp4", note: "Avatar video · rendering with HeyGen", status: "generating" },
   });
 
-  void (async () => {
+  // Runs after the response; after() keeps a serverless function alive until it finishes.
+  after(async () => {
     try {
       const client: Anthropic = await clientFor(workspaceId);
       const settings = await db.settings.findUniqueOrThrow({ where: { workspaceId } });
@@ -85,6 +87,6 @@ export async function startAvatarVideo(workspaceId: string, draftId: string): Pr
     } catch (e) {
       await db.imageAsset.update({ where: { id: asset.id }, data: { status: "failed", note: `Video failed: ${errMsg(e)}` } }).catch(() => undefined);
     }
-  })();
+  });
   return asset.id;
 }

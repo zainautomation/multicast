@@ -12,3 +12,6 @@ export const POST = route<{ id: string }>(async (_req, ctx, { id }) => {
   await startAvatarVideo(ctx.workspaceId, id);
   return { draft: await loadDraftDTO(id) };
 });
+
+// Generation, rendering and publishing can take minutes (Vercel function limit).
+export const maxDuration = 300;

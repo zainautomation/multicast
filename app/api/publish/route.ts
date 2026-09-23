@@ -31,3 +31,6 @@ export const POST = route(async (req, ctx) => {
   }
   return { results };
 });
+
+// Generation, rendering and publishing can take minutes (Vercel function limit).
+export const maxDuration = 300;

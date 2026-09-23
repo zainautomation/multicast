@@ -1,4 +1,4 @@
-import type { NextRequest } from "next/server";
+import { after, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { decryptJson } from "@/lib/crypto";
 import { verifySlackSignature, draftBlocks, postToSlack } from "@/lib/notify/slack";
@@ -75,6 +75,10 @@ export async function POST(req: NextRequest) {
   const workspaceId = await workspaceForSignature(raw, req.headers.get("x-slack-request-timestamp"), req.headers.get("x-slack-signature"));
   if (!workspaceId) return new Response("invalid signature", { status: 401 });
   const payload = JSON.parse(new URLSearchParams(raw).get("payload") ?? "{}") as Payload;
-  if (payload.type === "block_actions") void handle(workspaceId, payload);
+  // after() keeps the function alive for the work once Slack has its 200 (serverless-safe).
+  if (payload.type === "block_actions") after(() => handle(workspaceId, payload));
   return new Response("", { status: 200 });
 }
+
+// Generation, rendering and publishing can take minutes (Vercel function limit).
+export const maxDuration = 300;

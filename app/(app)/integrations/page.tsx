@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { getCtx } from "@/lib/auth";
 import { IntegrationsClient, type ToolView } from "@/components/integrations/IntegrationsClient";
+import { appUrl } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
       tools={{ canva: view("canva"), figma: view("figma"), higgsfield: view("higgsfield"), heygen: view("heygen"), custom: view("custom") }}
       slack={view("slack")}
       events={pref.events}
-      appUrl={(process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "")}
+      appUrl={appUrl()}
     />
   );
 }
