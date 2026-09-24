@@ -8,7 +8,7 @@ const API = "https://api.linkedin.com/rest";
 export function liHeaders(token: string, extra: Record<string, string> = {}) {
   return {
     Authorization: `Bearer ${token}`,
-    "LinkedIn-Version": process.env.LINKEDIN_API_VERSION || "202509",
+    "LinkedIn-Version": process.env.LINKEDIN_API_VERSION || "202608",
     "X-Restli-Protocol-Version": "2.0.0",
     "Content-Type": "application/json",
     ...extra,
