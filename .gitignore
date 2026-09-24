@@ -1,7 +1,15 @@
 node_modules
 .next
-.env
-.env.local
 *.tsbuildinfo
 next-env.d.ts
 /storage
+
+# local env files (secrets); the template stays tracked
+.vercel
+.env*
+!.env.example
+
+# local agent tooling added by the Vercel/Neon CLI
+.agents/
+.claude/
+skills-lock.json
