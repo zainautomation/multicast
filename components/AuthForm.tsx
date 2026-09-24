@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { Button, Field, inputMutedCls } from "@/components/ui";
 
-export function AuthForm({ mode }: { mode: "login" | "setup" }) {
+export function AuthForm({ mode, canCreate = false }: { mode: "login" | "setup"; canCreate?: boolean }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -61,6 +62,15 @@ export function AuthForm({ mode }: { mode: "login" | "setup" }) {
         <Button type="submit" variant="primary" size="lg" busy={busy}>
           {mode === "setup" ? "Create account" : "Sign in"}
         </Button>
+        {mode === "setup" ? (
+          <p className="m-0 text-center text-[13.5px] text-muted">
+            Already have an account? <Link href="/login">Sign in</Link>
+          </p>
+        ) : canCreate ? (
+          <p className="m-0 text-center text-[13.5px] text-muted">
+            No account yet? <Link href="/setup">Create the owner account</Link>
+          </p>
+        ) : null}
       </form>
     </div>
   );

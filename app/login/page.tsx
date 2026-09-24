@@ -7,10 +7,12 @@ export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
   if (await getCtx()) redirect("/compose");
-  if (!(await ownerExists())) redirect("/setup");
+  // No redirect to /setup here: people can always reach the sign-in form, and it links to
+  // account creation while no owner exists yet.
+  const canCreate = !(await ownerExists());
   return (
     <Providers>
-      <AuthForm mode="login" />
+      <AuthForm mode="login" canCreate={canCreate} />
     </Providers>
   );
 }
