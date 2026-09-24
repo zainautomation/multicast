@@ -9,6 +9,7 @@ import type { Slide, SlideLayout } from "@/lib/render/templates";
 import { newKey, putObject } from "@/lib/storage";
 import type { Creativity } from "@/lib/models";
 import { renderExternal, GENERATOR_LABEL } from "@/lib/integrations/creative";
+import { asArray, asObject, asStrings, asText } from "@/lib/generation/coerce";
 import type { GeneratorId } from "@/lib/prompts/defaults";
 
 export const RETURN_IMAGE_SPEC_TOOL = {
@@ -54,10 +55,10 @@ export type ImageJob = {
 };
 
 function visualBriefText(vb: unknown): string | null {
-  if (!vb || typeof vb !== "object") return null;
-  const v = vb as { format?: string; slides?: { headline: string; subline?: string | null }[] };
-  const slides = (v.slides ?? []).map((s, i) => `Slide ${i + 1}: ${s.headline}${s.subline ? ` — ${s.subline}` : ""}`);
-  return [`Format: ${v.format ?? "single"}`, ...slides].join("\n");
+  const v = asObject<{ format?: unknown; slides?: unknown }>(vb);
+  if (!v) return null;
+  const slides = parseSlides({ slides: v.slides }).map((s, i) => `Slide ${i + 1}: ${s.headline}${s.subline ? ` — ${s.subline}` : ""}`);
+  return [`Format: ${asText(v.format) ?? "single"}`, ...slides].join("\n");
 }
 
 export async function buildImageSpec(
@@ -65,7 +66,7 @@ export async function buildImageSpec(
   job: ImageJob,
 ): Promise<{ spec: ImageSpec; model: string; tokensIn: number; tokensOut: number }> {
   const d = job.layer.imageDefaults;
-  const carousel = d.format === "Carousel" || (job.visualBrief as { format?: string } | null)?.format === "carousel";
+  const carousel = d.format === "Carousel" || asObject<{ format?: unknown }>(job.visualBrief)?.format === "carousel";
   const vars = {
     brief: job.briefText,
     post_text: job.postText ?? null,
@@ -101,17 +102,29 @@ export async function buildImageSpec(
     .filter(Boolean)
     .join("\n\n");
 
-  const r = await callTool<{ slides: Slide[] }>({ client: ctx.client, model: ctx.model, system, user, tool: RETURN_IMAGE_SPEC_TOOL as Anthropic.Tool, creativity: ctx.creativity });
-  const slides = (r.input.slides ?? [])
-    .filter((s) => s && typeof s.headline === "string")
-    .map((s) => ({
-      headline: s.headline.trim(),
-      subline: s.subline?.trim() || null,
-      layout: (["headline-center", "headline-top", "quote", "checklist"].includes(s.layout) ? s.layout : "headline-center") as SlideLayout,
-      items: (s.items ?? []).map((x) => x.trim()).filter(Boolean),
-    }));
+  const r = await callTool<{ slides: unknown }>({ client: ctx.client, model: ctx.model, system, user, tool: RETURN_IMAGE_SPEC_TOOL as Anthropic.Tool, creativity: ctx.creativity });
+  const slides = parseSlides(r.input);
   if (!slides.length) slides.push({ headline: job.title ?? job.briefText.slice(0, 60), subline: null, layout: "headline-center", items: [] });
   return { spec: { slides: carousel ? slides.slice(0, 10) : slides.slice(0, 1) }, model: r.model, tokensIn: r.tokensIn, tokensOut: r.tokensOut };
+}
+
+const LAYOUTS: SlideLayout[] = ["headline-center", "headline-top", "quote", "checklist"];
+
+/** Tolerant reading of return_image_spec: slides may arrive as a JSON string or a lone object. */
+export function parseSlides(input: unknown): Slide[] {
+  const raw = asObject<{ slides?: unknown }>(input)?.slides ?? input;
+  return asArray<unknown>(raw)
+    .map((x) => (typeof x === "string" ? { headline: x } : asObject<Record<string, unknown>>(x)))
+    .filter((s): s is Record<string, unknown> => !!s && typeof s.headline === "string" && s.headline.trim() !== "")
+    .map((s) => {
+      const layout = asText(s.layout)?.trim() as SlideLayout | undefined;
+      return {
+        headline: String(s.headline).trim(),
+        subline: asText(s.subline)?.trim() || null,
+        layout: layout && LAYOUTS.includes(layout) ? layout : "headline-center",
+        items: asStrings(s.items),
+      };
+    });
 }
 
 export type RenderedImage = {

@@ -5,6 +5,8 @@ import type { Layer } from "@/lib/prompts/layers";
 import { PLATFORMS, type PlatformId } from "@/lib/platforms";
 import { linkPolicyFromRules, validateDraft, type Validation } from "@/lib/generation/validate";
 import type { Creativity } from "@/lib/models";
+import { asObject, asStrings, asText } from "@/lib/generation/coerce";
+import { parseSlides } from "@/lib/generation/image";
 
 export type TextResult = {
   output: DraftOutput;
@@ -23,16 +25,24 @@ export type GenContext = {
   bannedPhrases: string[];
 };
 
-function normalise(o: DraftOutput, platform: PlatformId): DraftOutput {
+/** Tolerant: fields can arrive JSON-encoded as strings or in the wrong shape (see coerce.ts). */
+export function normalise(raw: unknown, platform: PlatformId): DraftOutput {
   const p = PLATFORMS[platform];
+  const o = asObject<Record<string, unknown>>(raw) ?? {};
+  const vb = asObject<{ format?: unknown; slides?: unknown }>(o.visual_brief);
   return {
-    title: p.title ? (o.title ?? "").trim() || null : null,
-    subtitle: platform === "medium" ? (o.subtitle ?? "").trim() || null : null,
-    body: (o.body ?? "").replace(/\r\n/g, "\n").trim(),
-    first_comment: o.first_comment?.trim() || null,
-    hashtags: Array.from(new Set((o.hashtags ?? []).map((h) => h.replace(/^#/, "").trim()).filter(Boolean))),
-    visual_brief: o.visual_brief ?? null,
-    placeholders: o.placeholders ?? [],
+    title: p.title ? asText(o.title)?.trim() || null : null,
+    subtitle: platform === "medium" ? asText(o.subtitle)?.trim() || null : null,
+    body: (asText(o.body) ?? "").replace(/\r\n/g, "\n").trim(),
+    first_comment: asText(o.first_comment)?.trim() || null,
+    hashtags: Array.from(new Set(asStrings(o.hashtags).map((h) => h.replace(/^#/, "").trim()).filter(Boolean))),
+    visual_brief: vb
+      ? {
+          format: asText(vb.format) === "carousel" ? "carousel" : "single",
+          slides: parseSlides({ slides: vb.slides }).map((s) => ({ headline: s.headline, subline: s.subline ?? null })),
+        }
+      : null,
+    placeholders: asStrings(o.placeholders),
   };
 }
 

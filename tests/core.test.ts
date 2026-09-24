@@ -185,6 +185,11 @@ describe("crypto", () => {
     const b = encrypt("sk-ant-secret");
     expect(a).not.toBe(b);
     expect(decrypt(a)).toBe("sk-ant-secret");
-    expect(() => decrypt(a.replace(/.$/, (c) => (c === "A" ? "B" : "A")))).toThrow();
+    // Tamper with a middle character of the ciphertext (the last base64 char can be pure padding bits).
+    const parts = a.split(".");
+    const ct = parts[6];
+    const mid = Math.floor(ct.length / 2);
+    parts[6] = ct.slice(0, mid) + (ct[mid] === "A" ? "B" : "A") + ct.slice(mid + 1);
+    expect(() => decrypt(parts.join("."))).toThrow();
   });
 });
