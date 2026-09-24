@@ -1,65 +1,33 @@
-// Multicast worker: runs scheduled publishes and reminders from Redis (BullMQ).
-// Start with `npm run worker`. Jobs persist in Redis, so restarts lose nothing; a daily
-// reconciliation re-enqueues any pending item whose job went missing.
+// Multicast worker for self-hosted setups: runs scheduled publishes and reminders from
+// Redis (BullMQ). Start with `npm run worker`. Not needed when QSTASH_TOKEN is set: then
+// Upstash QStash calls /api/jobs instead (the Vercel setup).
+// Jobs persist in Redis, so restarts lose nothing; a daily reconciliation re-enqueues any
+// pending item whose job went missing.
 import { UnrecoverableError, Worker, type Job } from "bullmq";
 import { db } from "@/lib/db";
-import { publishDraft } from "@/lib/publishers";
-import { PublishError } from "@/lib/publishers/types";
-import { notify } from "@/lib/notify";
 import { queue, QUEUE_NAME, redisConnection, RETRY_DELAYS_MS, PUBLISH_ATTEMPTS } from "@/lib/schedule/queue";
+import { attemptPublish, runWeekly, sendReminder } from "@/lib/schedule/jobs";
 import { reconcile } from "@/lib/schedule/service";
 import { errMsg } from "@/lib/util";
 
 type Data = { itemId?: string };
 
 async function runPublish(job: Job<Data>) {
-  const item = await db.scheduleItem.findUnique({ where: { id: job.data.itemId! }, include: { draft: true } });
-  if (!item || item.status !== "pending" || item.mode !== "auto") return { skipped: "not pending" };
+  const item = await db.scheduleItem.findUnique({ where: { id: job.data.itemId! } });
+  if (!item) return { skipped: "no such item" };
   if (item.jobId && item.jobId !== job.id) return { skipped: "superseded by a reschedule" };
-
-  await db.scheduleItem.update({ where: { id: item.id }, data: { attempts: { increment: 1 } } });
-  try {
-    const { url } = await publishDraft(item.workspaceId, item.draftId);
-    await db.scheduleItem.update({ where: { id: item.id }, data: { status: "published", externalUrl: url, lastError: null } });
-    return { url };
-  } catch (e) {
-    const msg = errMsg(e);
-    const last = job.attemptsMade + 1 >= (job.opts.attempts ?? PUBLISH_ATTEMPTS);
-    const permanent = e instanceof PublishError && !e.retryable;
-    await db.scheduleItem.update({ where: { id: item.id }, data: { lastError: msg } });
-    if (permanent || last) {
-      await db.scheduleItem.update({ where: { id: item.id }, data: { status: "failed" } });
-      await db.draft.update({ where: { id: item.draftId }, data: { status: "failed", lastError: msg } });
-      await notify(item.workspaceId, "failed", { draft: item.draft, item, error: msg });
-      if (permanent) throw new UnrecoverableError(msg);
-    }
-    throw e;
-  }
+  const out = await attemptPublish(item.id, job.attemptsMade + 1, job.opts.attempts ?? PUBLISH_ATTEMPTS);
+  // Throwing hands the retry (1 / 5 / 15 min backoff) to BullMQ.
+  if (out.status === "retry") throw new Error(out.error);
+  if (out.status === "failed") throw new UnrecoverableError(out.error);
+  return out;
 }
 
 async function runRemind(job: Job<Data>) {
-  const item = await db.scheduleItem.findUnique({
-    where: { id: job.data.itemId! },
-    include: { draft: { include: { images: true, brief: { select: { subreddit: true } } } } },
-  });
-  if (!item || item.status !== "pending" || item.mode !== "remind") return { skipped: "not pending" };
+  const item = await db.scheduleItem.findUnique({ where: { id: job.data.itemId! } });
+  if (!item) return { skipped: "no such item" };
   if (item.remindJobId && item.remindJobId !== job.id) return { skipped: "superseded" };
-  await notify(item.workspaceId, "reminder", { item, draft: item.draft });
-  await db.scheduleItem.update({ where: { id: item.id }, data: { status: "sent" } });
-  return { sent: true };
-}
-
-async function runWeekly() {
-  const from = new Date(Date.now() - 7 * 86400_000);
-  const to = new Date(Date.now() + 7 * 86400_000);
-  const prefs = await db.notificationPref.findMany({ where: { events: { has: "weekly" } } });
-  for (const p of prefs) {
-    const [published, upcoming] = await Promise.all([
-      db.draft.findMany({ where: { workspaceId: p.workspaceId, status: "published", publishedAt: { gte: from } } }),
-      db.scheduleItem.findMany({ where: { workspaceId: p.workspaceId, status: "pending", runAtUtc: { gte: new Date(), lte: to } }, include: { draft: true }, orderBy: { runAtUtc: "asc" } }),
-    ]);
-    await notify(p.workspaceId, "weekly", { from, to, published, upcoming });
-  }
+  return sendReminder(item.id);
 }
 
 async function main() {

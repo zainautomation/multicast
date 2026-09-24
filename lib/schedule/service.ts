@@ -20,7 +20,7 @@ export async function effectiveMode(workspaceId: string, platform: PlatformId, r
 }
 
 async function enqueueFor(item: { id: string; workspaceId: string; runAtUtc: Date; mode: string }) {
-  if (!schedulerAvailable()) throw new HttpError(503, "Scheduling needs Redis (set REDIS_URL and run the worker). Post now still works.");
+  if (!schedulerAvailable()) throw new HttpError(503, "Scheduling is not set up: connect Upstash QStash (QSTASH_TOKEN), or set REDIS_URL and run the worker. Post now still works.");
   if (item.mode === "auto") return { jobId: await enqueuePublish(item.id, item.runAtUtc), remindJobId: null };
   const pref = await db.notificationPref.findUnique({ where: { workspaceId: item.workspaceId } });
   const at = reminderTime(item.runAtUtc, pref?.leadMinutes ?? 15, await workspaceTz(item.workspaceId));
@@ -32,7 +32,7 @@ export async function scheduleDraft(workspaceId: string, draftId: string, runAtU
   if (!d) throw new HttpError(404, "Draft not found");
   if (!["approved", "scheduled"].includes(d.status)) throw new HttpError(400, "Approve the draft before scheduling it");
   if (runAtUtc.getTime() < Date.now() - 60_000) throw new HttpError(400, "That time is in the past");
-  if (!schedulerAvailable()) throw new HttpError(503, "Scheduling needs Redis (set REDIS_URL and run the worker). Post now still works.");
+  if (!schedulerAvailable()) throw new HttpError(503, "Scheduling is not set up: connect Upstash QStash (QSTASH_TOKEN), or set REDIS_URL and run the worker. Post now still works.");
   const { mode } = await effectiveMode(workspaceId, d.platform as PlatformId, requestedMode);
 
   if (d.schedule) {
@@ -102,14 +102,15 @@ export async function suggestionsFor(workspaceId: string, draftIds: { id: string
 
 /** Daily reconciliation: re-enqueue pending items whose job went missing. */
 export async function reconcile() {
-  const { queue } = await import("@/lib/schedule/queue");
+  const { jobAlive } = await import("@/lib/schedule/queue");
   const pending = await db.scheduleItem.findMany({ where: { status: "pending" } });
   let fixed = 0;
   for (const it of pending) {
     const id = it.mode === "auto" ? it.jobId : it.remindJobId;
-    const job = id ? await queue().getJob(id) : null;
-    const state = job ? await job.getState() : "missing";
-    if (!job || state === "failed" || state === "unknown") {
+    // A reminder fires before runAt, so "still pending after runAt" means it was lost too.
+    // Retries re-enqueue (and touch updatedAt), so measure from the latest of the two.
+    const due = new Date(Math.max(it.runAtUtc.getTime(), it.updatedAt.getTime()));
+    if (!(await jobAlive(id, due))) {
       const jobs = await enqueueFor(it.runAtUtc.getTime() < Date.now() ? { ...it, runAtUtc: new Date(Date.now() + 5000) } : it);
       await db.scheduleItem.update({ where: { id: it.id }, data: jobs });
       fixed++;

@@ -31,7 +31,9 @@ Production: `npm run build && npm start`, plus `npm run worker` as a separate lo
 3. **Environment variables:** `ENCRYPTION_KEY` (`npm run gen:key`) and `NEXTAUTH_SECRET` are required. `APP_URL` and `NEXTAUTH_URL` default to the Vercel production URL; set them if you use a custom domain. Add the OAuth app variables as you connect platforms.
 4. **Deploy**, open the site, and create the owner account at `/setup`.
 
-**The scheduler worker does not run on Vercel.** Vercel functions are request-scoped, and BullMQ needs an always-on process. Scheduled auto-posts and reminders need `npm run worker` running somewhere with the same `DATABASE_URL`, `REDIS_URL`, `ENCRYPTION_KEY` and storage variables: Railway, Render, Fly.io or any small VM. Everything else works on Vercel alone, including Compose, Post now, prompts, the brand kit, integrations and Slack buttons.
+**Scheduling on Vercel uses Upstash QStash.** Add **Upstash QStash** from the Storage tab (free tier); it sets `QSTASH_TOKEN`, `QSTASH_URL` and the two signing keys. When a post is scheduled, QStash calls `/api/jobs` at the exact time. The endpoint verifies the Upstash signature, publishes or sends the reminder, and re-schedules failed publishes with the 1 / 5 / 15 minute backoff. The daily reconciliation and weekly summary run as QStash cron schedules. No worker process is needed.
+
+Self-hosted instead? Leave `QSTASH_TOKEN` unset, set `REDIS_URL`, and run `npm run worker` (BullMQ). The app picks QStash when its token is present, otherwise Redis.
 
 **Function time limit:** generation routes set `maxDuration = 300`. HeyGen videos that take longer than about 5 minutes to render will time out on Vercel.
 

@@ -334,7 +334,7 @@ export function ScheduleClient({
 
       {!scheduler ? (
         <div className="rounded-xl border border-[#F0D9BE] bg-warn-soft px-4 py-3 text-[14px] text-warn-text">
-          Scheduling needs Redis and the worker: set <code className="font-mono">REDIS_URL</code> and run <code className="font-mono">npm run worker</code>. Post now on Compose works without it.
+          Scheduling isn&apos;t set up yet. On Vercel, connect Upstash QStash (adds <code className="font-mono">QSTASH_TOKEN</code>); self-hosted, set <code className="font-mono">REDIS_URL</code> and run <code className="font-mono">npm run worker</code>. Post now on Compose works without it.
         </div>
       ) : null}
 
