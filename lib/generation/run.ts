@@ -244,7 +244,10 @@ export async function regenerateImage(workspaceId: string, draftId: string, opts
     sizeKey: opts.sizeKey ?? target?.sizeKey,
     replaceId: target?.generator === "upload" ? undefined : target?.id,
   });
-  if (d.status === "approved") await db.draft.update({ where: { id: draftId }, data: { status: finalStatus(d.warnings) } });
+  // The card now has media: drop the "needs an image" note; changing media restarts approval.
+  const cur = await db.draft.findUniqueOrThrow({ where: { id: draftId } });
+  const warnings = cur.warnings.filter((w) => !w.includes("needs an image"));
+  await db.draft.update({ where: { id: draftId }, data: { warnings, ...(d.status === "approved" ? { status: finalStatus(warnings) } : {}) } });
   return loadDTO(draftId);
 }
 

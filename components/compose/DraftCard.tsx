@@ -251,6 +251,18 @@ export function DraftCard({
       ) : null}
 
       <div className="h-0.5" />
+      {/* Post-only card: offer an image for just this platform, after the text exists. */}
+      {!d.images.length && !wantsImage && d.hasPost && !generating && !locked && !editing ? (
+        <div className="mx-4 mb-3.5 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-dashed border-dash px-3 py-2.5">
+          <span className="mr-auto text-[12.5px] text-muted">{busy === "regimg" ? "Writing the image text and rendering…" : tile.id === "ig" ? "Instagram needs an image to post" : "No image for this post"}</span>
+          <Button variant="link" size="sm" className="!min-h-8 text-[12.5px]" busy={busy === "regimg"} disabled={!!busy && busy !== "regimg"} onClick={() => call("regimg", `/api/drafts/${d.id}/image`, {})}>
+            Generate image
+          </Button>
+          <Button variant="linkMuted" size="sm" className="!min-h-8 text-[12.5px]" busy={busy === "upload"} disabled={!!busy && busy !== "upload"} onClick={() => fileRef.current?.click()}>
+            Upload my own
+          </Button>
+        </div>
+      ) : null}
       {(d.images.length ? d.images : wantsImage && !generating ? [null] : []).map((img, n) => {
         const video = !!img?.mimeType.startsWith("video/");
         const failed = img?.status === "failed";
