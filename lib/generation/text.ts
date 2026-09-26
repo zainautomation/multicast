@@ -3,7 +3,7 @@ import { callTool } from "@/lib/claude";
 import { assembleTextPrompt, RETURN_DRAFT_TOOL, type BriefInput, type DraftOutput } from "@/lib/prompts/assemble";
 import type { Layer } from "@/lib/prompts/layers";
 import { PLATFORMS, type PlatformId } from "@/lib/platforms";
-import { linkPolicyFromRules, validateDraft, type Validation } from "@/lib/generation/validate";
+import { linkPolicyFromRules, slugify, validateDraft, type Validation } from "@/lib/generation/validate";
 import type { Creativity } from "@/lib/models";
 import { asObject, asStrings, asText } from "@/lib/generation/coerce";
 import { parseSlides } from "@/lib/generation/image";
@@ -32,7 +32,8 @@ export function normalise(raw: unknown, platform: PlatformId): DraftOutput {
   const vb = asObject<{ format?: unknown; slides?: unknown }>(o.visual_brief);
   return {
     title: p.title ? asText(o.title)?.trim() || null : null,
-    subtitle: platform === "medium" ? asText(o.subtitle)?.trim() || null : null,
+    subtitle: p.subtitle ? asText(o.subtitle)?.replace(/\s+/g, " ").trim() || null : null,
+    slug: p.longForm ? slugify(asText(o.slug) || asText(o.title) || "") || null : null,
     body: (asText(o.body) ?? "").replace(/\r\n/g, "\n").trim(),
     first_comment: asText(o.first_comment)?.trim() || null,
     hashtags: Array.from(new Set(asStrings(o.hashtags).map((h) => h.replace(/^#/, "").trim()).filter(Boolean))),
@@ -49,7 +50,7 @@ export function normalise(raw: unknown, platform: PlatformId): DraftOutput {
 export function validateOutput(platform: PlatformId, o: DraftOutput, layer: Layer, bannedPhrases: string[], link?: string | null) {
   return validateDraft(
     platform,
-    { title: o.title, body: o.body, firstComment: o.first_comment, hashtags: o.hashtags },
+    { title: o.title, subtitle: o.subtitle, slug: o.slug, body: o.body, firstComment: o.first_comment, hashtags: o.hashtags },
     { bannedPhrases, linkPolicy: linkPolicyFromRules(layer.rules.cta, PLATFORMS[platform].linkPolicy), link, hashtagRule: layer.rules.hashtags },
   );
 }

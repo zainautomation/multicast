@@ -14,7 +14,7 @@ export async function workspaceTz(workspaceId: string): Promise<string> {
 /** Quora is always Remind me; Medium unless a token is stored; others need a linked account. */
 export async function effectiveMode(workspaceId: string, platform: PlatformId, requested: "auto" | "remind") {
   if (requested === "remind") return { mode: "remind" as const, forced: false };
-  if (PLATFORMS[platform].publish.kind === "copy") return { mode: "remind" as const, forced: true, reason: "Quora has no posting API" };
+  if (PLATFORMS[platform].publish.kind === "copy") return { mode: "remind" as const, forced: true, reason: `${PLATFORMS[platform].name} has no posting API` };
   if (!(await canAuto(workspaceId, platform))) return { mode: "remind" as const, forced: true, reason: `${PLATFORMS[platform].name} is not connected` };
   return { mode: "auto" as const, forced: false };
 }

@@ -2,6 +2,8 @@ import { PLATFORMS, type PlatformId } from "@/lib/platforms";
 
 export type DraftContent = {
   title?: string | null;
+  subtitle?: string | null;
+  slug?: string | null;
   body?: string | null;
   firstComment?: string | null;
   hashtags?: string[];
@@ -17,6 +19,19 @@ export type Validation = {
 const URL_RE = /\bhttps?:\/\/\S+|\bwww\.\S+\.\S+/i;
 const LINK_PLACEHOLDER_RE = /\[(?:YOUR )?LINK\]/i;
 const HASHTAG_RE = /(^|\s)#([\p{L}\p{N}_]+)/gu;
+export const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** "Hiring Remote Engineers: A Guide!" → "hiring-remote-engineers-a-guide" */
+export function slugify(s: string): string {
+  return s
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80)
+    .replace(/-+$/g, "");
+}
 
 export function inlineHashtags(text: string): string[] {
   const out: string[] = [];
@@ -72,11 +87,19 @@ export function validateDraft(
     if (p.title.idealMax && title.length > p.title.idealMax) notes.push(`${p.title.label} is ${title.length} characters; under ${p.title.idealMax} reads best.`);
   }
 
+  if (p.subtitle) {
+    const sub = d.subtitle ?? "";
+    if (p.subtitle.limit && sub.length > p.subtitle.limit) errors.push(`${p.subtitle.label} is ${sub.length} characters; the limit is ${p.subtitle.limit}.`);
+    if (platform === "blog" && !sub.trim()) notes.push("Add a meta description: search engines show it under the title.");
+  }
+  if (p.longForm && d.slug && !SLUG_RE.test(d.slug)) errors.push("The slug may only use lowercase letters, numbers and single hyphens.");
+
   const ruleMax = hashtagMaxFromRule(opts.hashtagRule);
   const max = p.hashtags.max === null ? ruleMax : ruleMax === null ? p.hashtags.max : Math.min(p.hashtags.max, ruleMax);
   if (max !== null) {
-    const n = platform === "medium" ? (d.hashtags ?? []).length : countHashtags(body, d.hashtags);
-    const what = platform === "medium" ? "topics" : "hashtags";
+    const topics = p.hashtags.kind === "topics";
+    const n = topics ? (d.hashtags ?? []).length : countHashtags(body, d.hashtags);
+    const what = topics ? (platform === "blog" ? "tags" : "topics") : "hashtags";
     if (max === 0 && n > 0) errors.push(`${p.name} posts should not use ${what} here (found ${n}).`);
     else if (max > 0 && n > max) errors.push(`${n} ${what}; the maximum is ${max}.`);
   }

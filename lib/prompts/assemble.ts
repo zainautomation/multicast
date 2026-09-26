@@ -6,6 +6,7 @@ export type BriefInput = {
   goal: string;
   tone: string;
   link?: string | null;
+  keyword?: string | null;
   subreddit?: string | null;
   subredditRules?: string | null;
 };
@@ -35,6 +36,7 @@ export function briefVars(b: BriefInput, brandVoice: string): Record<string, str
     goal: b.goal,
     tone: b.tone === TONES[0] ? "platform default" : b.tone,
     link: b.link ?? null,
+    keyword: b.keyword ?? null,
     subreddit: b.subreddit ?? null,
     subreddit_rules: b.subredditRules ?? null,
     brand_voice: brandVoice,
@@ -62,6 +64,7 @@ export function assembleTextPrompt(opts: {
   const user: string[] = [`BRIEF:\n${opts.brief.text.trim()}`, `GOAL: ${opts.brief.goal}`];
   if (opts.brief.tone && opts.brief.tone !== TONES[0]) user.push(`TONE OVERRIDE: ${opts.brief.tone}. This overrides the platform's usual tone.`);
   user.push(`LINK: ${opts.brief.link ?? "[YOUR LINK] (no link given; use this placeholder where a link belongs)"}`);
+  if (PLATFORMS[opts.platform].longForm) user.push(`TARGET KEYWORD: ${opts.brief.keyword?.trim() || "(none given: choose the most natural search phrase for this topic)"}`);
   if (opts.platform === "reddit") {
     user.push(`SUBREDDIT: ${opts.brief.subreddit ?? "[SUBREDDIT]"}`);
     user.push(`SUBREDDIT RULES:\n${opts.brief.subredditRules ?? "(rules could not be fetched; be conservative: no self-promotion, disclose affiliation)"}`);
@@ -77,10 +80,11 @@ export const RETURN_DRAFT_TOOL = {
   input_schema: {
     type: "object" as const,
     additionalProperties: false,
-    required: ["title", "subtitle", "body", "first_comment", "hashtags", "visual_brief", "placeholders"],
+    required: ["title", "subtitle", "slug", "body", "first_comment", "hashtags", "visual_brief", "placeholders"],
     properties: {
       title: { type: ["string", "null"], description: "Quora question, Medium title or Reddit title; null if the platform has no title." },
-      subtitle: { type: ["string", "null"], description: "Medium subtitle; null elsewhere." },
+      subtitle: { type: ["string", "null"], description: "Medium subtitle or blog meta description; null elsewhere." },
+      slug: { type: ["string", "null"], description: "URL slug for long-form posts (blog, Medium); null elsewhere." },
       body: { type: "string", description: "The post body with line breaks preserved." },
       first_comment: { type: ["string", "null"], description: "Text for the first comment (e.g. the link), or null." },
       hashtags: { type: "array", items: { type: "string" } },
@@ -114,6 +118,7 @@ export const RETURN_DRAFT_TOOL = {
 export type DraftOutput = {
   title: string | null;
   subtitle?: string | null;
+  slug?: string | null;
   body: string;
   first_comment: string | null;
   hashtags: string[];

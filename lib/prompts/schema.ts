@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { FORMAT_OPTIONS, STYLE_OPTIONS } from "@/lib/prompts/defaults";
 
-export const LAYER_IDS = ["brand", "fb", "ig", "lip", "lic", "quora", "medium", "reddit"] as const;
+export const LAYER_IDS = ["brand", "fb", "ig", "lip", "lic", "quora", "medium", "blog", "reddit"] as const;
 
 export const RulesPatch = z
   .object({

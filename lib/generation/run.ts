@@ -64,8 +64,8 @@ async function prepare(workspaceId: string, subreddit?: string | null): Promise<
   };
 }
 
-function briefInput(b: { text: string; goal: string; tone: string; link: string | null; subreddit: string | null }, reddit: SubredditInfo | null): BriefInput {
-  return { text: b.text, goal: b.goal, tone: b.tone, link: b.link, subreddit: reddit?.name ?? b.subreddit, subredditRules: reddit?.rulesText ?? null };
+function briefInput(b: { text: string; goal: string; tone: string; link: string | null; keyword?: string | null; subreddit: string | null }, reddit: SubredditInfo | null): BriefInput {
+  return { text: b.text, goal: b.goal, tone: b.tone, link: b.link, keyword: b.keyword ?? null, subreddit: reddit?.name ?? b.subreddit, subredditRules: reddit?.rulesText ?? null };
 }
 
 /** Generate (or regenerate) the text part of one draft. */
@@ -89,6 +89,7 @@ async function doText(s: Shared, draftId: string, platform: PlatformId, brief: B
     data: {
       title: o.title,
       subtitle: o.subtitle ?? null,
+      slug: o.slug ?? null,
       body: o.body,
       firstComment: o.first_comment,
       hashtags: o.hashtags,

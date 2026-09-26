@@ -19,6 +19,10 @@ export type PlatformTile = {
   limit: number;
   titleLabel: string | null;
   titleLimit: number | null;
+  subtitleLabel: string | null;
+  subtitleLimit: number | null;
+  longForm: boolean;
+  tagsLabel: string | null;
   sizes: SizePreset[];
   enabled: boolean;
   auto: boolean;
@@ -26,7 +30,7 @@ export type PlatformTile = {
   firstComment: boolean;
 };
 
-type BriefLite = { id: string; text: string; goal: string; tone: string; subreddit: string | null; postPlatforms: string[]; imagePlatforms: string[]; createdAt: string };
+type BriefLite = { id: string; text: string; goal: string; tone: string; subreddit: string | null; keyword?: string | null; postPlatforms: string[]; imagePlatforms: string[]; createdAt: string };
 type Upload = { platform: string; url: string; mimeType: string; width: number | null; height: number | null; name: string };
 
 const GOALS = ["Traffic / downloads", "Awareness", "Engagement", "Leads"];
@@ -59,8 +63,10 @@ export function ComposeClient({
   const [goal, setGoal] = useState(initialBrief?.goal ?? GOALS[0]);
   const [tone, setTone] = useState(initialBrief?.tone ?? TONES[0]);
   const [subreddit, setSubreddit] = useState(initialBrief?.subreddit ?? "r/startups");
+  const [keyword, setKeyword] = useState(initialBrief?.keyword ?? "");
   const [posts, setPosts] = useState<Set<string>>(new Set(initialBrief?.postPlatforms ?? DEFAULT_POSTS.filter((p) => byId[p]?.enabled)));
   const [imgs, setImgs] = useState<Set<string>>(new Set(initialBrief?.imagePlatforms ?? initialImages));
+  const wantsLongForm = [...posts].some((p) => byId[p]?.longForm);
   const [generator, setGenerator] = useState(initialGenerator);
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [uploadFor, setUploadFor] = useState<string>("");
@@ -123,6 +129,7 @@ export function ComposeClient({
           goal,
           tone,
           subreddit: posts.has("reddit") || imgs.has("reddit") ? subreddit : null,
+          keyword: wantsLongForm ? keyword.trim() || null : null,
           postPlatforms: [...posts],
           imagePlatforms: [...imgs],
           generator,
@@ -149,7 +156,7 @@ export function ComposeClient({
           if (!line) continue;
           const ev = JSON.parse(line);
           if (ev.type === "brief") {
-            setBrief({ ...ev.brief, goal, tone, subreddit, postPlatforms: [...posts], imagePlatforms: [...imgs] });
+            setBrief({ ...ev.brief, goal, tone, subreddit, keyword, postPlatforms: [...posts], imagePlatforms: [...imgs] });
             setDrafts(ev.drafts);
             window.history.replaceState(null, "", `/compose?brief=${ev.brief.id}`);
           } else if (ev.type === "draft") updateDraft(ev.draft);
@@ -312,6 +319,11 @@ export function ComposeClient({
                 );
               })}
             </div>
+            {wantsLongForm ? (
+              <Field label="Target keyword (optional)" hint="The search phrase the blog post should rank for. Used in the SEO title, first paragraph, a heading and the meta description.">
+                {(id) => <input id={id} className={inputMutedCls} value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="e.g. hire remote engineers" />}
+              </Field>
+            ) : null}
             {posts.has("reddit") || imgs.has("reddit") ? (
               <Field label="Subreddit" hint="Its rules are fetched and passed to the prompt before writing.">
                 {(id) => <input id={id} className={inputMutedCls + " font-mono"} value={subreddit} onChange={(e) => setSubreddit(e.target.value)} placeholder="r/startups" />}

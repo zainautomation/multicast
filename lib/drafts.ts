@@ -21,7 +21,7 @@ export async function revalidate(workspaceId: string, draftId: string) {
   const layer = layers[platform];
   const v = validateDraft(
     platform,
-    { title: d.title, body: d.body, firstComment: d.firstComment, hashtags: d.hashtags },
+    { title: d.title, subtitle: d.subtitle, slug: d.slug, body: d.body, firstComment: d.firstComment, hashtags: d.hashtags },
     { bannedPhrases: brand.bannedPhrases, linkPolicy: linkPolicyFromRules(layer.rules.cta, PLATFORMS[platform].linkPolicy), link: d.brief.link, hashtagRule: layer.rules.hashtags },
   );
   const keep = splitWarnings(d.warnings).notes.filter((n) => /^(Image|Instagram needs|r\/.+ does not allow)/.test(n));

@@ -2,7 +2,7 @@
 // the Compose / Prompts / Schedule UI and the publishers all read these values.
 // [verify] every number against the platform's current docs before each release.
 
-export const PLATFORM_IDS = ["fb", "ig", "lip", "lic", "quora", "medium", "reddit"] as const;
+export const PLATFORM_IDS = ["fb", "ig", "lip", "lic", "quora", "medium", "blog", "reddit"] as const;
 export type PlatformId = (typeof PLATFORM_IDS)[number];
 export type LayerId = PlatformId | "brand";
 
@@ -20,9 +20,14 @@ export interface PlatformSpec {
   textLimit: number;
   /** Title rules; null = platform has no title field. */
   title: { label: string; required: boolean; limit: number | null; idealMax?: number } | null;
+  /** Secondary line (Medium subtitle, blog meta description); stored in draft.subtitle. */
+  subtitle?: { label: string; limit: number | null; instruction: string };
+  /** Long-form platforms show a word count and get a URL slug. */
+  longForm?: boolean;
   /** Approximate characters visible before "See more". */
   visibleBeforeMore: number | null;
-  hashtags: { max: number | null; label: string };
+  /** kind "topics": tags live in the hashtags array (no # in the body) and only the array counts. */
+  hashtags: { max: number | null; label: string; kind?: "inline" | "topics" };
   sizes: SizePreset[]; // first entry is the default
   publish: {
     kind: PublishKind;
@@ -174,8 +179,10 @@ export const PLATFORMS: Record<PlatformId, PlatformSpec> = {
     color: "#2B2924",
     textLimit: 0,
     title: { label: "Title", required: true, limit: null, idealMax: 60 },
+    subtitle: { label: "Subtitle", limit: null, instruction: 'Return the one-sentence subtitle in "subtitle".' },
+    longForm: true,
     visibleBeforeMore: null,
-    hashtags: { max: 5, label: "Max 5 topics" },
+    hashtags: { max: 5, label: "Max 5 topics", kind: "topics" },
     sizes: [s(1400, 788, "Header 16:9"), s(1400, 1050, "4:3"), s(1200, 630, "Social share")],
     publish: {
       kind: "token-draft",
@@ -189,6 +196,37 @@ export const PLATFORMS: Record<PlatformId, PlatformSpec> = {
       { k: "Format", v: "Markdown / HTML" },
     ],
     composeUrl: () => "https://medium.com/new-story",
+  },
+  blog: {
+    id: "blog",
+    name: "Blog",
+    short: "Blog",
+    mono: "Bl",
+    color: "#3D5A45",
+    textLimit: 0,
+    title: { label: "SEO title", required: true, limit: 70, idealMax: 60 },
+    subtitle: {
+      label: "Meta description",
+      limit: 160,
+      instruction: 'Return a meta description of 140–160 characters in "subtitle": a plain summary that includes the target keyword, no quotes.',
+    },
+    longForm: true,
+    visibleBeforeMore: null,
+    hashtags: { max: 8, label: "Up to 8 tags", kind: "topics" },
+    sizes: [s(1200, 630, "Social / OG"), s(1600, 900, "Hero 16:9"), s(1200, 800, "3:2")],
+    publish: {
+      kind: "copy",
+      label: "Draft + export · Markdown / HTML",
+      note: "Your blog post is prepared here with an SEO title, meta description, slug and tags. Export it as Markdown (with front matter) or HTML and paste it into your CMS. Scheduled blog posts use reminders.",
+    },
+    linkPolicy: "body",
+    specRows: [
+      { k: "SEO title", v: "≤ 70 chars (60 ideal)" },
+      { k: "Meta description", v: "≤ 160 chars" },
+      { k: "Tags", v: "Up to 8" },
+      { k: "Format", v: "Markdown, H2 / H3 sections" },
+    ],
+    composeUrl: () => process.env.BLOG_ADMIN_URL || `${(process.env.APP_URL || "").replace(/\/$/, "")}/compose`,
   },
   reddit: {
     id: "reddit",
@@ -282,8 +320,14 @@ export function hardLimitsBlock(platform: PlatformId): string {
   if (p.linkPolicy === "first_comment")
     lines.push('- No URLs in the body. Put the link in "first_comment" and mention that it is in the first comment.');
   if (p.linkPolicy === "link_in_bio") lines.push('- No URLs in the body (links are not clickable). Say "link in bio" instead.');
-  if (platform === "medium") lines.push('- Return the one-sentence subtitle in "subtitle" and the Markdown article in "body". Put topic tags in "hashtags" without the # sign.');
-  else lines.push('- Set "subtitle" to null.');
+  if (p.subtitle) {
+    lines.push(`- ${p.subtitle.instruction}${p.subtitle.limit ? ` It must be at most ${p.subtitle.limit} characters.` : ""}`);
+  } else lines.push('- Set "subtitle" to null.');
+  if (p.hashtags.kind === "topics") lines.push('- Put tags in "hashtags" without the # sign, and do not write hashtags in the body.');
+  if (p.longForm) {
+    lines.push('- Write "body" in Markdown. Do not repeat the title as an H1; start with the introduction and use ## / ### headings.');
+    lines.push('- Return a URL slug in "slug": lowercase words joined by hyphens, 3–7 words, no dates or stop-word padding.');
+  } else lines.push('- Set "slug" to null.');
   if (platform === "ig") lines.push('- Always return "visual_brief" describing the image or carousel.');
   lines.push('- Return hashtags both inline where the platform expects them and in the "hashtags" array (without duplicates).');
   lines.push('- List every [PLACEHOLDER]-style token you used in "placeholders".');

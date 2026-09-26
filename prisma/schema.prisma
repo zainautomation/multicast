@@ -136,6 +136,7 @@ model Brief {
   tone           String
   link           String?
   subreddit      String?
+  keyword        String? // blog / Medium target keyword
   postPlatforms  String[]
   imagePlatforms String[]
   generator      String   @default("builtin")
@@ -152,7 +153,8 @@ model Draft {
   platform        String
   hasPost         Boolean       @default(true)
   title           String?
-  subtitle        String?
+  subtitle        String? // Medium subtitle or blog meta description
+  slug            String? // long-form URL slug
   body            String?
   firstComment    String?
   hashtags        String[]      @default([])

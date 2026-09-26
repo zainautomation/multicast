@@ -33,6 +33,10 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
       limit: p.textLimit,
       titleLabel: p.title?.label ?? null,
       titleLimit: p.title?.limit ?? null,
+      subtitleLabel: p.subtitle?.label ?? null,
+      subtitleLimit: p.subtitle?.limit ?? null,
+      longForm: !!p.longForm,
+      tagsLabel: p.hashtags.kind === "topics" ? (p.id === "blog" ? "Tags" : "Topics") : null,
       sizes: p.sizes,
       enabled: layers[p.id as PlatformId]?.enabled ?? true,
       auto: await canAuto(ws, p.id),
@@ -60,7 +64,7 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
       initialGenerator={generators.find((g) => g.id === settings.lastGenerator && g.on)?.id ?? "builtin"}
       initialBrief={
         brief
-          ? { id: brief.id, text: brief.text, goal: brief.goal, tone: brief.tone, subreddit: brief.subreddit, postPlatforms: brief.postPlatforms, imagePlatforms: brief.imagePlatforms, createdAt: brief.createdAt.toISOString() }
+          ? { id: brief.id, text: brief.text, goal: brief.goal, tone: brief.tone, subreddit: brief.subreddit, keyword: brief.keyword, postPlatforms: brief.postPlatforms, imagePlatforms: brief.imagePlatforms, createdAt: brief.createdAt.toISOString() }
           : null
       }
       initialDrafts={brief ? brief.drafts.map(draftDTO) : []}

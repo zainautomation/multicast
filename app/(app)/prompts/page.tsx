@@ -14,6 +14,7 @@ const SUB: Record<string, string> = {
   lic: "Company page",
   quora: "Answers & Spaces",
   medium: "Articles",
+  blog: "Your website",
   reddit: "Per subreddit",
 };
 

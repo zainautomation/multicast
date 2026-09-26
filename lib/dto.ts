@@ -21,6 +21,7 @@ export type DraftDTO = {
   hasPost: boolean;
   title: string | null;
   subtitle: string | null;
+  slug: string | null;
   body: string | null;
   firstComment: string | null;
   hashtags: string[];
@@ -78,6 +79,7 @@ export function draftDTO(d: Draft & { images?: ImageAsset[]; schedule?: Schedule
     hasPost: d.hasPost,
     title: d.title,
     subtitle: d.subtitle,
+    slug: d.slug,
     body: d.body,
     firstComment: d.firstComment,
     hashtags: d.hashtags,

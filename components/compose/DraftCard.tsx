@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api, Button, cx, Monogram, Spinner, useToast } from "@/components/ui";
 import type { DraftDTO, ImageDTO } from "@/lib/dto";
 import type { PlatformTile } from "@/components/compose/ComposeClient";
+import { toHtml, toMarkdown, wordCount } from "@/lib/export";
 
 const BOX = 132;
 
@@ -62,6 +63,9 @@ export function DraftCard({
   const [title, setTitle] = useState(d.title ?? "");
   const [body, setBody] = useState(d.body ?? "");
   const [comment, setComment] = useState(d.firstComment ?? "");
+  const [subtitle, setSubtitle] = useState(d.subtitle ?? "");
+  const [slug, setSlug] = useState(d.slug ?? "");
+  const [tags, setTags] = useState(d.hashtags.join(", "));
   const [busy, setBusy] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -73,7 +77,11 @@ export function DraftCard({
   const len = text.length;
   const over = tile.limit > 0 && len > tile.limit;
   const titleOver = !!tile.titleLimit && (editing ? title : d.title ?? "").length > tile.titleLimit;
+  const subLen = (editing ? subtitle : d.subtitle ?? "").length;
+  const subOver = !!tile.subtitleLimit && subLen > tile.subtitleLimit;
+  const counter = tile.longForm ? `${wordCount(text).toLocaleString()} words` : tile.limit ? `${len.toLocaleString()} / ${tile.limit.toLocaleString()}` : `${len.toLocaleString()} chars`;
   const img = d.images[0] ?? null;
+  const headerUrl = d.images.find((i) => i.mimeType.startsWith("image/") && i.urls.length)?.urls[0] ?? null;
   const variants = Array.isArray(d.variants) ? (d.variants as { body: string }[]) : [];
 
   async function run<T>(key: string, fn: () => Promise<T>) {
@@ -96,13 +104,26 @@ export function DraftCard({
     });
 
   async function saveEdit() {
-    const r = await call("save", `/api/drafts/${d.id}`, { title: tile.titleLabel ? title : undefined, body, firstComment: comment || null }, "PATCH");
+    const r = await call(
+      "save",
+      `/api/drafts/${d.id}`,
+      {
+        title: tile.titleLabel ? title : undefined,
+        subtitle: tile.subtitleLabel ? subtitle.trim() || null : undefined,
+        slug: tile.longForm ? slug.trim() || null : undefined,
+        hashtags: tile.tagsLabel ? tags.split(",").map((x) => x.replace(/^#/, "").trim()).filter(Boolean) : undefined,
+        body,
+        firstComment: comment || null,
+      },
+      "PATCH",
+    );
     if (r) setEditing(false);
   }
 
   async function primary() {
-    if (tile.copyMode && d.hasPost && !approved) {
-      const full = [d.title, d.subtitle, d.body].filter(Boolean).join("\n\n");
+    // Long-form posts are exported from the Export row, so Approve only approves.
+    if (tile.copyMode && d.hasPost && !approved && !tile.longForm) {
+      const full = tile.longForm ? toMarkdown(d, { imageUrl: headerUrl }) : [d.title, d.subtitle, d.body].filter(Boolean).join("\n\n");
       try {
         await navigator.clipboard.writeText(full);
         toast("Copied to clipboard", "ok");
@@ -138,7 +159,28 @@ export function DraftCard({
     });
   }
 
-  const primaryLabel = !d.hasPost ? (approved ? "Image approved" : "Approve image") : tile.copyMode ? (approved ? "Copied" : "Copy text") : approved ? "Approved" : "Approve";
+  async function copy(what: "md" | "html") {
+    const out = what === "md" ? toMarkdown(d, { imageUrl: headerUrl }) : toHtml(d, { imageUrl: headerUrl });
+    try {
+      await navigator.clipboard.writeText(out);
+      toast(what === "md" ? "Markdown copied (with front matter)" : "HTML copied", "ok");
+    } catch {
+      toast("Could not copy automatically", "error");
+    }
+  }
+
+  function downloadMd() {
+    const blob = new Blob([toMarkdown(d, { imageUrl: headerUrl })], { type: "text/markdown" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${d.slug || tile.id}.md`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
+  const primaryLabel = !d.hasPost ? (approved ? "Image approved" : "Approve image") : tile.copyMode && !tile.longForm ? (approved ? "Copied" : "Copy text") : approved ? "Approved" : "Approve";
 
   return (
     <article className="flex flex-col overflow-hidden rounded-[16px] border border-line bg-surface" aria-busy={generating || undefined}>
@@ -152,7 +194,7 @@ export function DraftCard({
           </span>
         </div>
         <span className={cx("whitespace-nowrap rounded-md bg-bg px-2 py-1 font-mono text-xs", over ? "text-danger" : "text-muted")} aria-label={over ? "Over the character limit" : undefined}>
-          {!d.hasPost ? "Image" : tile.limit ? `${len.toLocaleString()} / ${tile.limit.toLocaleString()}` : `${len.toLocaleString()} chars`}
+          {!d.hasPost ? "Image" : counter}
         </span>
       </div>
 
@@ -180,12 +222,39 @@ export function DraftCard({
               <input id={`t-${d.id}`} value={title} onChange={(e) => setTitle(e.target.value)} className="min-h-10 rounded-[9px] border border-input bg-surface-muted px-3 text-sm" />
             </div>
           ) : null}
+          {tile.subtitleLabel ? (
+            <div className="flex flex-col gap-1">
+              <label htmlFor={`s-${d.id}`} className="flex justify-between text-[12.5px] font-semibold">
+                {tile.subtitleLabel}
+                {tile.subtitleLimit ? <span className={cx("font-mono font-normal", subOver ? "text-danger" : "text-caption")}>{subtitle.length} / {tile.subtitleLimit}</span> : null}
+              </label>
+              <textarea id={`s-${d.id}`} rows={2} value={subtitle} onChange={(e) => setSubtitle(e.target.value)} className="resize-y rounded-[9px] border border-input bg-surface-muted p-2.5 text-[13px]" />
+            </div>
+          ) : null}
+          {tile.longForm ? (
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-1">
+                <label htmlFor={`u-${d.id}`} className="text-[12.5px] font-semibold">
+                  Slug
+                </label>
+                <input id={`u-${d.id}`} value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, "-"))} className="min-h-10 rounded-[9px] border border-input bg-surface-muted px-3 font-mono text-[12.5px]" />
+              </div>
+              {tile.tagsLabel ? (
+                <div className="flex flex-col gap-1">
+                  <label htmlFor={`g-${d.id}`} className="text-[12.5px] font-semibold">
+                    {tile.tagsLabel} (comma separated)
+                  </label>
+                  <input id={`g-${d.id}`} value={tags} onChange={(e) => setTags(e.target.value)} className="min-h-10 rounded-[9px] border border-input bg-surface-muted px-3 text-[13px]" />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <div className="flex flex-col gap-1">
             <label htmlFor={`b-${d.id}`} className="flex justify-between text-[12.5px] font-semibold">
-              Post
-              <span className={cx("font-mono font-normal", over ? "text-danger" : "text-caption")}>{tile.limit ? `${len.toLocaleString()} / ${tile.limit.toLocaleString()}` : `${len.toLocaleString()} chars`}</span>
+              {tile.longForm ? "Article (Markdown)" : "Post"}
+              <span className={cx("font-mono font-normal", over ? "text-danger" : "text-caption")}>{counter}</span>
             </label>
-            <textarea id={`b-${d.id}`} rows={10} value={body} onChange={(e) => setBody(e.target.value)} className="resize-y rounded-[9px] border border-input bg-surface-muted p-3 text-[13.5px] leading-[1.55]" />
+            <textarea id={`b-${d.id}`} rows={tile.longForm ? 16 : 10} value={body} onChange={(e) => setBody(e.target.value)} className="resize-y rounded-[9px] border border-input bg-surface-muted p-3 text-[13.5px] leading-[1.55]" />
           </div>
           {tile.firstComment || d.firstComment ? (
             <div className="flex flex-col gap-1">
@@ -201,13 +270,48 @@ export function DraftCard({
           {d.hasPost ? (
             <>
               {d.title ? <div className={cx("px-4 pt-3.5 text-[15px] font-semibold leading-[1.35]", titleOver && "text-danger")}>{d.title}</div> : null}
-              {d.subtitle ? <div className="px-4 pt-1 text-[13.5px] italic text-muted">{d.subtitle}</div> : null}
+              {d.subtitle && tile.id === "blog" ? (
+                <div className="mx-4 mt-2 rounded-lg border border-divider bg-surface-muted px-3 py-2 text-[12.5px] leading-snug text-muted">
+                  <span className="font-semibold text-ink">Meta description</span>{" "}
+                  <span className={cx("font-mono", subOver ? "text-danger" : "text-caption")}>
+                    {subLen}/{tile.subtitleLimit}
+                  </span>
+                  <br />
+                  {d.subtitle}
+                </div>
+              ) : d.subtitle ? (
+                <div className="px-4 pt-1 text-[13.5px] italic text-muted">{d.subtitle}</div>
+              ) : null}
+              {tile.longForm && (d.slug || d.hashtags.length) ? (
+                <div className="flex flex-wrap items-center gap-1.5 px-4 pt-2 text-[12px] text-muted">
+                  {d.slug ? <span className="font-mono">/{d.slug}</span> : null}
+                  {d.hashtags.map((t) => (
+                    <span key={t} className="rounded-[10px] bg-bg px-2 py-0.5">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               <div className="max-h-[200px] overflow-y-auto whitespace-pre-line px-4 pb-3.5 pt-3 text-[13.5px] leading-[1.55] text-ink-soft" tabIndex={0} aria-label={`${tile.name} post text`}>
                 {d.body}
               </div>
               {d.firstComment ? (
                 <div className="mx-4 mb-3 rounded-lg border border-divider bg-surface-muted px-3 py-2 text-[12.5px] text-muted">
                   <span className="font-semibold text-ink">First comment:</span> {d.firstComment}
+                </div>
+              ) : null}
+              {tile.longForm && d.body ? (
+                <div className="mx-4 mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px]">
+                  <span className="text-caption">Export</span>
+                  <Button variant="link" size="sm" className="!min-h-8 text-[12.5px]" onClick={() => copy("md")}>
+                    Copy Markdown
+                  </Button>
+                  <Button variant="link" size="sm" className="!min-h-8 text-[12.5px]" onClick={() => copy("html")}>
+                    Copy HTML
+                  </Button>
+                  <Button variant="linkMuted" size="sm" className="!min-h-8 text-[12.5px]" onClick={downloadMd}>
+                    Download .md
+                  </Button>
                 </div>
               ) : null}
             </>
@@ -367,6 +471,9 @@ export function DraftCard({
                   setTitle(d.title ?? "");
                   setBody(d.body ?? "");
                   setComment(d.firstComment ?? "");
+                  setSubtitle(d.subtitle ?? "");
+                  setSlug(d.slug ?? "");
+                  setTags(d.hashtags.join(", "));
                   setEditing(true);
                 }}
               >

@@ -35,7 +35,7 @@ export const RULE_OPTIONS = {
 export const STYLE_OPTIONS: ImageStyle[] = ["Typographic", "Illustration", "Photographic", "Diagram / checklist"];
 export const FORMAT_OPTIONS: ImageFormat[] = ["Single image", "Carousel"];
 
-export const TEXT_VARIABLES = ["{brief}", "{goal}", "{tone}", "{link}", "{subreddit}", "{brand_voice}"];
+export const TEXT_VARIABLES = ["{brief}", "{goal}", "{tone}", "{link}", "{keyword}", "{subreddit}", "{brand_voice}"];
 export const IMAGE_VARIABLES = ["{brief}", "{post_text}", "{visual_brief}", "{bg_color}", "{text_color}", "{logo_position}", "{signature}"];
 
 export const DEFAULT_BANNED_PHRASES = [
@@ -97,6 +97,15 @@ Return QUESTION and ANSWER separately.`,
 Return TITLE (under 60 characters), SUBTITLE (one sentence) and BODY in Markdown.
 Structure: a short story or problem opening, 3–5 H2 sections, a practical takeaway, then the call to action.
 Suggest up to 5 topic tags.`,
+  blog: `Write a blog post for our website from the brief.
+
+Target keyword: {keyword}. Use it naturally in the title, the first paragraph and one H2; never stuff it.
+Open with the reader's problem in two or three sentences, then say what the post will give them.
+Structure: a short introduction, 4–6 H2 sections (H3 where a section needs steps), and a closing section with one clear call to action and the link.
+Write for scanners: short paragraphs, numbered steps or bullets where they help, bold only for key terms.
+Be concrete and useful on its own. Explain, don't sell; mention our product only where it genuinely helps.
+Add a short "Key takeaways" list of 3–5 bullets right after the introduction.
+Suggest up to 8 tags.`,
   reddit: `Write a Reddit text post for {subreddit}.
 
 Read the subreddit rules in {subreddit_rules} and follow them strictly.
@@ -142,6 +151,11 @@ No marketing copy, no logo.`,
 
 Abstract or typographic, relating to the article's theme.
 No text other than the title. Keep the centre clear because Medium crops headers.`,
+  blog: `Create the header image for the blog post {title}.
+
+Typographic: the title (or a shorter version, 8 words or fewer) set large, with generous margins.
+It doubles as the social share image, so keep it legible at small sizes.
+Logo {logo_position}, company signature (website) along the bottom.`,
   reddit: `Only if {subreddit} allows image posts.
 
 A plain, informative graphic such as a checklist or simple diagram.
@@ -155,6 +169,7 @@ export const DEFAULT_RULES: Record<PlatformId, OutputRules> = {
   lic: { length: "Short (60–150 words)", hashtags: "1–3", emoji: "None", voice: "Brand (we)", cta: "In post body", variants: 1 },
   quora: { length: "Long (250–500 words)", hashtags: "None", emoji: "None", voice: "First person (I)", cta: "In post body", variants: 1 },
   medium: { length: "Long (800–1,500 words)", hashtags: "Up to 5 topics", emoji: "None", voice: "First person (I)", cta: "In post body", variants: 1 },
+  blog: { length: "Long (1,200–2,000 words)", hashtags: "Up to 8 tags", emoji: "None", voice: "Brand (we)", cta: "In post body", variants: 1 },
   reddit: { length: "Medium (150–300 words)", hashtags: "None", emoji: "None", voice: "First person (I)", cta: "No link", variants: 1 },
 };
 
@@ -170,6 +185,7 @@ export const DEFAULT_IMAGE_DEFAULTS: Record<PlatformId, ImageDefaults> = {
   lic: { sizeKey: "1200x627", bgHex: INK, fgHex: IVORY, generator: "builtin", style: "Typographic", format: "Single image", include: { logo: true, sig: true, headline: true } },
   quora: { sizeKey: "1200x630", bgHex: WHITE, fgHex: INK, generator: "builtin", style: "Diagram / checklist", format: "Single image", include: { logo: false, sig: false, headline: true } },
   medium: { sizeKey: "1400x788", bgHex: IVORY, fgHex: INK, generator: "builtin", style: "Illustration", format: "Single image", include: { logo: false, sig: false, headline: true } },
+  blog: { sizeKey: "1200x630", bgHex: INK, fgHex: IVORY, generator: "builtin", style: "Typographic", format: "Single image", include: { logo: true, sig: true, headline: true } },
   reddit: { sizeKey: "1200x900", bgHex: WHITE, fgHex: INK, generator: "builtin", style: "Diagram / checklist", format: "Single image", include: { logo: false, sig: false, headline: true } },
 };
 
@@ -205,6 +221,7 @@ export const DEFAULT_WINDOWS: Record<PlatformId, { days: number[]; startMin: num
   reddit: { days: [0, 1, 2], startMin: 15 * 60, endMin: 17 * 60 },
   quora: { days: [0, 1, 2, 3, 4], startMin: 10 * 60, endMin: 12 * 60 },
   medium: { days: [1, 2, 3], startMin: 9 * 60, endMin: 11 * 60 },
+  blog: { days: [1, 2, 3], startMin: 9 * 60, endMin: 11 * 60 },
 };
 
 export function rulesToSentences(r: OutputRules): string {

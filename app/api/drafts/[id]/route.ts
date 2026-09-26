@@ -7,13 +7,14 @@ import { HttpError } from "@/lib/errors";
 const Edit = z.object({
   title: z.string().max(1000).nullable().optional(),
   subtitle: z.string().max(1000).nullable().optional(),
+  slug: z.string().max(120).nullable().optional(),
+  hashtags: z.array(z.string().max(100)).max(30).optional(),
   body: z.string().max(100_000).optional(),
   firstComment: z.string().max(3000).nullable().optional(),
-  hashtags: z.array(z.string().max(100)).max(30).optional(),
   useVariant: z.number().int().min(0).max(2).optional(),
 });
 
-type Variant = { title: string | null; subtitle?: string | null; body: string; first_comment: string | null; hashtags: string[] };
+type Variant = { title: string | null; subtitle?: string | null; slug?: string | null; body: string; first_comment: string | null; hashtags: string[] };
 
 /** Inline edit. Editing an approved draft sends it back for approval; validation re-runs. */
 export const PATCH = route<{ id: string }>(async (req, ctx, { id }) => {
@@ -26,8 +27,8 @@ export const PATCH = route<{ id: string }>(async (req, ctx, { id }) => {
     const variants = ((d.variants as Variant[] | null) ?? []).slice();
     const v = variants[e.useVariant];
     if (!v) throw new HttpError(404, "Variant not found");
-    variants[e.useVariant] = { title: d.title, subtitle: d.subtitle, body: d.body ?? "", first_comment: d.firstComment, hashtags: d.hashtags };
-    data = { title: v.title, subtitle: v.subtitle ?? null, body: v.body, firstComment: v.first_comment, hashtags: v.hashtags, variants };
+    variants[e.useVariant] = { title: d.title, subtitle: d.subtitle, slug: d.slug, body: d.body ?? "", first_comment: d.firstComment, hashtags: d.hashtags };
+    data = { title: v.title, subtitle: v.subtitle ?? null, slug: v.slug ?? d.slug, body: v.body, firstComment: v.first_comment, hashtags: v.hashtags, variants };
   } else {
     const { useVariant: _u, ...fields } = e;
     data = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
