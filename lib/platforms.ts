@@ -2,7 +2,7 @@
 // the Compose / Prompts / Schedule UI and the publishers all read these values.
 // [verify] every number against the platform's current docs before each release.
 
-export const PLATFORM_IDS = ["fb", "ig", "lip", "lic", "quora", "medium", "blog", "reddit"] as const;
+export const PLATFORM_IDS = ["fb", "ig", "x", "lip", "lic", "quora", "medium", "blog", "reddit"] as const;
 export type PlatformId = (typeof PLATFORM_IDS)[number];
 export type LayerId = PlatformId | "brand";
 
@@ -18,6 +18,8 @@ export interface PlatformSpec {
   color: string;
   /** Max characters of body text (0 = no hard limit). */
   textLimit: number;
+  /** "x": weighted length (URLs 23, emoji/CJK 2) instead of plain characters. */
+  lengthMode?: "x";
   /** Title rules; null = platform has no title field. */
   title: { label: string; required: boolean; limit: number | null; idealMax?: number } | null;
   /** Secondary line (Medium subtitle, blog meta description); stored in draft.subtitle. */
@@ -96,6 +98,32 @@ export const PLATFORMS: Record<PlatformId, PlatformSpec> = {
       { k: "Reel / Story", v: "1080×1920 (9:16)" },
     ],
     composeUrl: () => "https://www.instagram.com/",
+  },
+  x: {
+    id: "x",
+    name: "X",
+    short: "X",
+    mono: "X",
+    color: "#2E3238",
+    textLimit: 280,
+    lengthMode: "x",
+    title: null,
+    visibleBeforeMore: null,
+    hashtags: { max: 2, label: "0–2 recommended" },
+    sizes: [s(1600, 900, "16:9"), s(1080, 1080, "Square"), s(1080, 1350, "Portrait 4:5")],
+    publish: {
+      kind: "auto",
+      label: "Auto-post · X API",
+      note: "Auto-posts through the X API (v2) with OAuth 1.0a. Up to 4 images per post. With \"First comment\" as the link placement, the link is posted as a reply to your post.",
+    },
+    linkPolicy: "body",
+    specRows: [
+      { k: "Max length", v: "280 (weighted)" },
+      { k: "Links", v: "Each counts as 23" },
+      { k: "Emoji / CJK", v: "Count as 2" },
+      { k: "Images", v: "Up to 4 · 1600×900" },
+    ],
+    composeUrl: () => "https://x.com/compose/post",
   },
   lip: {
     id: "lip",
@@ -304,7 +332,8 @@ export function canAutoPublish(platform: PlatformId, connected: boolean): boolea
 export function hardLimitsBlock(platform: PlatformId): string {
   const p = PLATFORMS[platform];
   const lines: string[] = ["HARD LIMITS (enforced in code; drafts that break them are rejected):"];
-  if (p.textLimit) lines.push(`- Body must be at most ${p.textLimit.toLocaleString("en-US")} characters.`);
+  if (p.lengthMode === "x") lines.push(`- Body must be at most ${p.textLimit} characters as X counts them: every URL counts as 23 characters and each emoji counts as 2. Aim for 240 or fewer.`);
+  else if (p.textLimit) lines.push(`- Body must be at most ${p.textLimit.toLocaleString("en-US")} characters.`);
   else lines.push("- No hard body limit; keep it as long as the content needs and no longer.");
   if (p.visibleBeforeMore)
     lines.push(`- Only about the first ${p.visibleBeforeMore} characters show before "see more"; front-load the hook.`);

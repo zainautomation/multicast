@@ -6,6 +6,7 @@ import { facebookPublisher, instagramPublisher } from "@/lib/publishers/meta";
 import { linkedinCompanyPublisher, linkedinProfilePublisher } from "@/lib/publishers/linkedin";
 import { redditPublisher } from "@/lib/publishers/reddit";
 import { mediumPublisher } from "@/lib/publishers/medium";
+import { xPublisher } from "@/lib/publishers/x";
 import { accountToken, getAccount } from "@/lib/publishers/accounts";
 import { PublishError, type Publisher } from "@/lib/publishers/types";
 import { splitWarnings } from "@/lib/dto";
@@ -19,6 +20,7 @@ const PUBLISHERS: Partial<Record<PlatformId, Publisher>> = {
   lic: linkedinCompanyPublisher,
   reddit: redditPublisher,
   medium: mediumPublisher,
+  x: xPublisher,
   // Quora: copy mode only (no public API)
 };
 

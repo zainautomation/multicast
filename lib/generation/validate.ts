@@ -1,4 +1,5 @@
 import { PLATFORMS, type PlatformId } from "@/lib/platforms";
+import { xLength } from "@/lib/xtext";
 
 export type DraftContent = {
   title?: string | null;
@@ -78,8 +79,9 @@ export function validateDraft(
   const title = d.title ?? "";
 
   if (!body.trim()) errors.push("Body is empty.");
-  if (p.textLimit && body.length > p.textLimit)
-    errors.push(`Body is ${body.length.toLocaleString("en-US")} characters; the limit is ${p.textLimit.toLocaleString("en-US")}.`);
+  const length = p.lengthMode === "x" ? xLength(body) : body.length;
+  if (p.textLimit && length > p.textLimit)
+    errors.push(`Body is ${length.toLocaleString("en-US")} characters${p.lengthMode === "x" ? " as X counts them" : ""}; the limit is ${p.textLimit.toLocaleString("en-US")}.`);
 
   if (p.title) {
     if (p.title.required && !title.trim()) errors.push(`${p.title.label} is required.`);

@@ -22,6 +22,7 @@ export type PlatformTile = {
   subtitleLabel: string | null;
   subtitleLimit: number | null;
   longForm: boolean;
+  xCount: boolean;
   tagsLabel: string | null;
   sizes: SizePreset[];
   enabled: boolean;

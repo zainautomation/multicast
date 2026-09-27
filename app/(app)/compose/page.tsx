@@ -36,6 +36,7 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
       subtitleLabel: p.subtitle?.label ?? null,
       subtitleLimit: p.subtitle?.limit ?? null,
       longForm: !!p.longForm,
+      xCount: p.lengthMode === "x",
       tagsLabel: p.hashtags.kind === "topics" ? (p.id === "blog" ? "Tags" : "Topics") : null,
       sizes: p.sizes,
       enabled: layers[p.id as PlatformId]?.enabled ?? true,

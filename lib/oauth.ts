@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
-import { decryptJson } from "@/lib/crypto";
+import { decrypt, decryptJson, encrypt } from "@/lib/crypto";
+import { authHeader, xKeys } from "@/lib/oauth1";
 import { HttpError } from "@/lib/errors";
 import { GRAPH } from "@/lib/publishers/meta";
 import { saveAccount } from "@/lib/publishers/accounts";
@@ -12,7 +13,7 @@ import { appUrl } from "@/lib/env";
 // OAuth for publishing accounts (Meta, LinkedIn, Reddit) and Canva. The `state` value and
 // (for Canva) the PKCE verifier live in a short-lived httpOnly cookie and must match on return.
 
-export const PROVIDERS = ["meta", "linkedin", "reddit", "canva"] as const;
+export const PROVIDERS = ["meta", "linkedin", "reddit", "x", "canva"] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
 const APP = appUrl;
@@ -20,6 +21,11 @@ export const redirectUri = (p: Provider) => `${APP()}/api/oauth/${p}/callback`;
 const cookieName = (p: Provider) => `mc_oauth_${p}`;
 
 const b64url = (b: Buffer) => b.toString("base64url");
+
+// X OAuth 1.0a endpoints. [verify] api.x.com vs api.twitter.com hosts.
+const X_REQUEST_TOKEN = "https://api.x.com/oauth/request_token";
+const X_AUTHORIZE = "https://api.x.com/oauth/authorize";
+const X_ACCESS_TOKEN = "https://api.x.com/oauth/access_token";
 
 function need(name: string) {
   const v = process.env[name];
@@ -60,6 +66,25 @@ export async function startUrl(p: Provider, workspaceId: string): Promise<string
     case "reddit": {
       url = new URL("https://www.reddit.com/api/v1/authorize");
       url.search = new URLSearchParams({ client_id: need("REDDIT_CLIENT_ID"), response_type: "code", state, redirect_uri: redirectUri(p), duration: "permanent", scope: "identity submit read flair" }).toString();
+      break;
+    }
+    case "x": {
+      // OAuth 1.0a: get a request token, then send the user to authorize it. The request
+      // token doubles as "state"; its secret stays server-side in the (encrypted) cookie.
+      const keys = xKeys();
+      const res = await fetch(X_REQUEST_TOKEN, {
+        method: "POST",
+        headers: { Authorization: authHeader("POST", X_REQUEST_TOKEN, keys, { extraOauth: { oauth_callback: redirectUri(p) } }) },
+      });
+      const text = await res.text();
+      const t = new URLSearchParams(text);
+      if (!res.ok || t.get("oauth_callback_confirmed") !== "true") {
+        throw new HttpError(400, `X rejected the sign-in request (${res.status}). Check the consumer keys and that ${redirectUri(p)} is a registered callback URL. ${text.slice(0, 160)}`);
+      }
+      payload.state = t.get("oauth_token")!;
+      payload.secret = encrypt(t.get("oauth_token_secret")!);
+      url = new URL(X_AUTHORIZE);
+      url.search = new URLSearchParams({ oauth_token: payload.state }).toString();
       break;
     }
     case "canva": {
@@ -171,6 +196,25 @@ export async function finish(p: Provider, workspaceId: string, code: string, sta
         expiresAt: new Date(Date.now() + (t.expires_in ?? 3600) * 1000),
         displayName: `u/${me.name}`,
         meta: { username: me.name },
+      });
+      return;
+    }
+    case "x": {
+      // code = oauth_verifier; state = the request token X sent back.
+      const keys = xKeys();
+      const res = await fetch(X_ACCESS_TOKEN, {
+        method: "POST",
+        headers: {
+          Authorization: authHeader("POST", X_ACCESS_TOKEN, { ...keys, token: state!, tokenSecret: decrypt(saved.secret) }, { extraOauth: { oauth_verifier: code } }),
+        },
+      });
+      const text = await res.text();
+      const t = new URLSearchParams(text);
+      if (!res.ok || !t.get("oauth_token")) throw new HttpError(400, `X token exchange failed (${res.status}): ${text.slice(0, 160)}`);
+      await saveAccount(workspaceId, "x", {
+        tokens: { accessToken: t.get("oauth_token")!, tokenSecret: t.get("oauth_token_secret")! },
+        displayName: `@${t.get("screen_name")}`,
+        meta: { userId: t.get("user_id"), username: t.get("screen_name") },
       });
       return;
     }

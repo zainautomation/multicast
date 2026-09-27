@@ -73,6 +73,12 @@ Use short lines and simple arrows or line breaks for scannability.
 Links are not clickable in captions: say "link in bio".
 End with up to 5 specific hashtags. Never exceed 5.
 Also return a VISUAL_BRIEF: format (single, carousel or reel), slide count and on-image text per slide.`,
+  x: `Write a single post for X (Twitter) from the brief.
+
+Lead with the sharpest point: a claim, number from the brief, or question. No warm-up.
+One idea, plain words, under 240 characters so it reads in one glance.
+Include the link only if the rules say it goes in the body. Links count as 23 characters.
+At most 2 hashtags, and only if they are ones people actually search. No emoji walls.`,
   lip: `Write a LinkedIn post in first person, as the account owner.
 
 Opening two lines carry the post: a clear observation or tension, under 210 characters combined.
@@ -133,6 +139,10 @@ Slide 1: the hook, 7 words or fewer, very large type.
 Slides 2–4: one point per slide, 20 words or fewer.
 Last slide: "Link in bio" with logo and signature line.
 Keep a 120 px safe margin; nothing important in the bottom 15% (UI overlays).`,
+  x: `Create an image for an X post about {brief}.
+
+A bold headline of 6 words or fewer, very large; it must read at thumbnail size in the feed.
+Background {bg_color}, text {text_color}. Logo {logo_position}, signature line small along the bottom.`,
   lip: `Create one LinkedIn image to support a first-person post.
 
 Pull the single most quotable line from {post_text} and set it as large type.
@@ -165,6 +175,7 @@ No logo, no signature line, no promotional wording.`,
 export const DEFAULT_RULES: Record<PlatformId, OutputRules> = {
   fb: { length: "Short (40–120 words)", hashtags: "None", emoji: "Sparingly", voice: "Brand (we)", cta: "In post body", variants: 1 },
   ig: { length: "Medium (80–150 words)", hashtags: "3–5", emoji: "Sparingly", voice: "Brand (we)", cta: "Link in bio", variants: 1 },
+  x: { length: "Short (one or two sentences)", hashtags: "None", emoji: "Sparingly", voice: "Brand (we)", cta: "In post body", variants: 1 },
   lip: { length: "Medium (120–220 words)", hashtags: "None", emoji: "None", voice: "First person (I)", cta: "First comment", variants: 1 },
   lic: { length: "Short (60–150 words)", hashtags: "1–3", emoji: "None", voice: "Brand (we)", cta: "In post body", variants: 1 },
   quora: { length: "Long (250–500 words)", hashtags: "None", emoji: "None", voice: "First person (I)", cta: "In post body", variants: 1 },
@@ -181,6 +192,7 @@ const WHITE = "#FFFFFF";
 export const DEFAULT_IMAGE_DEFAULTS: Record<PlatformId, ImageDefaults> = {
   fb: { sizeKey: "1080x1350", bgHex: INK, fgHex: IVORY, generator: "builtin", style: "Typographic", format: "Single image", include: { logo: true, sig: true, headline: true } },
   ig: { sizeKey: "1080x1350", bgHex: CLAY, fgHex: WHITE, generator: "builtin", style: "Typographic", format: "Carousel", include: { logo: true, sig: true, headline: true } },
+  x: { sizeKey: "1600x900", bgHex: INK, fgHex: IVORY, generator: "builtin", style: "Typographic", format: "Single image", include: { logo: true, sig: true, headline: true } },
   lip: { sizeKey: "1080x1350", bgHex: IVORY, fgHex: INK, generator: "builtin", style: "Typographic", format: "Single image", include: { logo: false, sig: true, headline: true } },
   lic: { sizeKey: "1200x627", bgHex: INK, fgHex: IVORY, generator: "builtin", style: "Typographic", format: "Single image", include: { logo: true, sig: true, headline: true } },
   quora: { sizeKey: "1200x630", bgHex: WHITE, fgHex: INK, generator: "builtin", style: "Diagram / checklist", format: "Single image", include: { logo: false, sig: false, headline: true } },
@@ -215,6 +227,7 @@ export const SEED_TEXT_COLORS = [
 
 export const DEFAULT_WINDOWS: Record<PlatformId, { days: number[]; startMin: number; endMin: number }> = {
   lip: { days: [1, 2, 3], startMin: 8 * 60 + 30, endMin: 10 * 60 + 30 },
+  x: { days: [0, 1, 2, 3, 4], startMin: 9 * 60, endMin: 11 * 60 },
   lic: { days: [1, 2, 3], startMin: 11 * 60, endMin: 13 * 60 },
   fb: { days: [0, 1, 2, 3, 4], startMin: 12 * 60, endMin: 14 * 60 },
   ig: { days: [0, 1, 2, 3, 4, 5], startMin: 17 * 60 + 30, endMin: 19 * 60 + 30 },

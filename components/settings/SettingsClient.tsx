@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { api, Button, Card, Field, inputCls, inputMutedCls, Monogram, PageHeader, Pill, useToast } from "@/components/ui";
 
 export type AccountRow = {
-  id: "meta" | "linkedin" | "reddit" | "medium" | "quora";
+  id: "meta" | "linkedin" | "x" | "reddit" | "medium" | "quora";
   name: string;
   mono: string;
   color: string;

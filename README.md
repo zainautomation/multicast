@@ -2,7 +2,7 @@
 
 One brief in, platform-native posts (and optional brand images) out. Then publish now, schedule, or get reminded.
 
-Platforms: Facebook Page, Instagram, LinkedIn Profile, LinkedIn Company Page, Quora, Medium, Reddit, and your own **Blog** (long-form article with SEO title, meta description, slug and tags, exported as Markdown with front matter or HTML).
+Platforms: Facebook Page, Instagram, X, LinkedIn Profile, LinkedIn Company Page, Quora, Medium, Reddit, and your own **Blog** (long-form article with SEO title, meta description, slug and tags, exported as Markdown with front matter or HTML).
 Built from `multicast-build-spec.md` and the approved design (six screens: Compose, Schedule, Platform prompts, Brand kit, Integrations, Claude API & accounts).
 
 ## Quick start
@@ -46,6 +46,7 @@ Self-hosted instead? Leave `QSTASH_TOKEN` unset, set `REDIS_URL`, and run `npm r
 | Instagram publishing | Images at a public HTTPS URL, so configure `S3_*`. Local `./storage` is dev only |
 | Auto-publishing | OAuth app credentials in `.env` (`META_*`, `LINKEDIN_*`, `REDDIT_*`), then **Connect** in the app |
 | LinkedIn Company Page | Community Management API approval, then set `LINKEDIN_COMPANY_ENABLED=true` |
+| X | `X_CONSUMER_KEY` / `X_CONSUMER_SECRET` (app permissions "Read and write", callback `{APP_URL}/api/oauth/x/callback`), then **Connect**. Posts with up to 4 images; length is counted the way X counts it (URLs = 23) |
 | Medium | An existing integration token (Medium no longer issues new ones) |
 | Quora | Nothing: copy mode plus reminders only |
 | Blog | Nothing: export Markdown / HTML from the card; scheduled blog posts use reminders (set `BLOG_ADMIN_URL` to deep-link reminders to your CMS) |
@@ -53,7 +54,7 @@ Self-hosted instead? Leave `QSTASH_TOKEN` unset, set `REDIS_URL`, and run `npm r
 | Browser notifications | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` (`npx web-push generate-vapid-keys`) |
 | Canva, Figma, Higgsfield, HeyGen, custom webhook, Slack | Credentials entered on the Integrations screen |
 
-OAuth redirect URLs to register with each provider: `{APP_URL}/api/oauth/{meta|linkedin|reddit|canva}/callback`.
+OAuth redirect URLs to register with each provider: `{APP_URL}/api/oauth/{meta|linkedin|x|reddit|canva}/callback`.
 Slack interactivity URL: `{APP_URL}/api/slack/actions` (bot-token mode, signing secret required).
 
 ## How generation works

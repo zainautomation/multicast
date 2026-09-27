@@ -12,12 +12,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
   if (!ctx) return NextResponse.redirect(new URL("/login", app));
   const sp = req.nextUrl.searchParams;
   if (!(PROVIDERS as readonly string[]).includes(provider)) return NextResponse.redirect(new URL(`${back}?error=unknown_provider`, app));
-  const denied = sp.get("error_description") || sp.get("error");
+  // OAuth 1.0a (X) returns oauth_token + oauth_verifier, or denied=… when cancelled.
+  const denied = sp.get("error_description") || sp.get("error") || (sp.get("denied") ? "You cancelled the X sign-in" : null);
   if (denied) return NextResponse.redirect(new URL(`${back}?error=${encodeURIComponent(denied)}`, app));
-  const code = sp.get("code");
+  const code = sp.get("code") ?? sp.get("oauth_verifier");
   if (!code) return NextResponse.redirect(new URL(`${back}?error=missing_code`, app));
   try {
-    await finish(provider as Provider, ctx.workspaceId, code, sp.get("state"));
+    await finish(provider as Provider, ctx.workspaceId, code, sp.get("state") ?? sp.get("oauth_token"));
     return NextResponse.redirect(new URL(`${back}?connected=${provider}`, app));
   } catch (e) {
     return NextResponse.redirect(new URL(`${back}?error=${encodeURIComponent(errMsg(e))}`, app));

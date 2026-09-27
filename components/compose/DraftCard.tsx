@@ -6,6 +6,7 @@ import { api, Button, cx, Monogram, Spinner, useToast } from "@/components/ui";
 import type { DraftDTO, ImageDTO } from "@/lib/dto";
 import type { PlatformTile } from "@/components/compose/ComposeClient";
 import { toHtml, toMarkdown, wordCount } from "@/lib/export";
+import { xLength } from "@/lib/xtext";
 
 const BOX = 132;
 
@@ -74,7 +75,7 @@ export function DraftCard({
   const approved = d.status === "approved";
   const blocked = d.warnings.length > 0;
   const text = editing ? body : d.body ?? "";
-  const len = text.length;
+  const len = tile.xCount ? xLength(text) : text.length;
   const over = tile.limit > 0 && len > tile.limit;
   const titleOver = !!tile.titleLimit && (editing ? title : d.title ?? "").length > tile.titleLimit;
   const subLen = (editing ? subtitle : d.subtitle ?? "").length;

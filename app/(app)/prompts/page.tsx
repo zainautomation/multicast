@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 const SUB: Record<string, string> = {
   fb: "Meta",
   ig: "Meta · Business or Creator",
+  x: "Posts",
   lip: "Personal account",
   lic: "Company page",
   quora: "Answers & Spaces",

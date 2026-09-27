@@ -45,6 +45,16 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       expires: by.lip?.expiresAt?.toISOString() ?? null,
     },
     {
+      id: "x",
+      name: "X",
+      mono: "X",
+      color: "#2E3238",
+      detail: by.x ? `${by.x.displayName} · posts and images via the X API` : "Posts with up to 4 images · OAuth 1.0a",
+      status: st(by.x) ?? (env("X_CONSUMER_KEY") ? "none" : "setup"),
+      kind: "oauth",
+      setupHint: "Set X_CONSUMER_KEY and X_CONSUMER_SECRET in Vercel",
+    },
+    {
       id: "reddit",
       name: "Reddit",
       mono: "r/",

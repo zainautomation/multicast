@@ -11,8 +11,8 @@ import { toLittleText } from "@/lib/publishers/linkedin";
 import { costMicroUsd, modelInfo } from "@/lib/models";
 
 describe("platform config", () => {
-  it("has all 8 platforms with a default size", () => {
-    expect(PLATFORM_IDS).toHaveLength(8);
+  it("has all 9 platforms with a default size", () => {
+    expect(PLATFORM_IDS).toHaveLength(9);
     for (const id of PLATFORM_IDS) expect(PLATFORMS[id].sizes.length).toBeGreaterThan(0);
   });
   it("defaults Instagram to 1080 × 1350", () => {

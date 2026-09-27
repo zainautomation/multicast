@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { decryptJson, encryptJson } from "@/lib/crypto";
 import type { PlatformId } from "@/lib/platforms";
 
-export type Tokens = { accessToken: string; refreshToken?: string; tokenType?: string; scope?: string };
+export type Tokens = { accessToken: string; refreshToken?: string; tokenType?: string; scope?: string; /** OAuth 1.0a (X) */ tokenSecret?: string };
 
 export type Account = { row: PublishingAccount; tokens: Tokens; meta: Record<string, unknown> };
 
