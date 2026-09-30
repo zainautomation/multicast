@@ -1,5 +1,4 @@
 import sharp from "sharp";
-import DOMPurify from "isomorphic-dompurify";
 import { HttpError } from "@/lib/errors";
 import { newKey, putObject } from "@/lib/storage";
 
@@ -48,6 +47,9 @@ export async function storeUpload(file: File, kind: keyof typeof LIMITS, opts: {
   if (!mime || !opts.allow.includes(mime)) throw new HttpError(415, `Unsupported file type. Allowed: ${opts.allow.map((m) => EXT[m]).join(", ")}`);
 
   if (mime === "image/svg+xml") {
+    // Loaded only for SVGs: it pulls in jsdom, which is heavy and has failed to load on
+    // some serverless runtimes; nothing else on the upload path should depend on it.
+    const { default: DOMPurify } = await import("isomorphic-dompurify");
     const clean = DOMPurify.sanitize(buf.toString("utf8"), { USE_PROFILES: { svg: true, svgFilters: true }, FORBID_TAGS: ["script", "foreignObject", "style"], FORBID_ATTR: ["onload", "onclick", "href", "xlink:href"] });
     if (!clean.includes("<svg")) throw new HttpError(415, "The SVG could not be read after sanitising");
     buf = Buffer.from(clean, "utf8");
