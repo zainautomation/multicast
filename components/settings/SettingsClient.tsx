@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, Button, Card, Field, inputCls, inputMutedCls, Monogram, PageHeader, Pill, useToast } from "@/components/ui";
+import { ExternalAccess, type TokenRow } from "@/components/settings/ExternalAccess";
 
 export type AccountRow = {
   id: "meta" | "linkedin" | "x" | "reddit" | "medium" | "quora";
@@ -43,12 +44,14 @@ export function SettingsClient({
   checkerModels,
   accounts,
   flash,
+  mcp,
 }: {
   claude: Claude;
   draftModels: { id: string; label: string }[];
   checkerModels: { id: string; label: string }[];
   accounts: AccountRow[];
   flash: { connected: string | null; error: string | null };
+  mcp: { url: string; tokens: TokenRow[] };
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -317,6 +320,8 @@ export function SettingsClient({
           })}
         </Card>
       </div>
+
+      <ExternalAccess mcpUrl={mcp.url} initial={mcp.tokens} />
     </>
   );
 }

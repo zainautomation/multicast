@@ -262,3 +262,40 @@ model UsageRecord {
 
   @@index([workspaceId, createdAt])
 }
+
+// ─── External access (MCP) ───────────────────────────────────────────────
+// Bearer tokens for /api/mcp. "key" = API key made in Settings (no expiry);
+// "oauth" = issued to an MCP client (e.g. a Claude connector) through the OAuth flow.
+model ApiToken {
+  id          String    @id @default(cuid())
+  workspaceId String
+  kind        String // key | oauth
+  name        String
+  tokenHash   String    @unique // sha256 of the secret; the secret itself is never stored
+  hint        String // first characters, shown in Settings
+  clientId    String?
+  refreshHash String?   @unique
+  expiresAt   DateTime?
+  refreshExpiresAt DateTime?
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([workspaceId])
+}
+
+model OAuthClient {
+  id           String   @id @default(cuid()) // client_id
+  name         String
+  redirectUris String[]
+  createdAt    DateTime @default(now())
+}
+
+model OAuthCode {
+  codeHash      String   @id
+  clientId      String
+  workspaceId   String
+  redirectUri   String
+  codeChallenge String
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+}

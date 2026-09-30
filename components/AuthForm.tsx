@@ -5,7 +5,7 @@ import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { Button, Field, inputMutedCls } from "@/components/ui";
 
-export function AuthForm({ mode, canCreate = false }: { mode: "login" | "setup"; canCreate?: boolean }) {
+export function AuthForm({ mode, canCreate = false, next = null }: { mode: "login" | "setup"; canCreate?: boolean; next?: string | null }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -24,7 +24,7 @@ export function AuthForm({ mode, canCreate = false }: { mode: "login" | "setup";
       }
       const r = await signIn("credentials", { email, password, redirect: false });
       if (!r || r.error) throw new Error("Email or password is incorrect");
-      window.location.href = mode === "setup" ? "/settings" : "/compose";
+      window.location.href = mode === "setup" ? "/settings" : (next ?? "/compose");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setBusy(false);

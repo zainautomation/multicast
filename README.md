@@ -57,6 +57,15 @@ Self-hosted instead? Leave `QSTASH_TOKEN` unset, set `REDIS_URL`, and run `npm r
 OAuth redirect URLs to register with each provider: `{APP_URL}/api/oauth/{meta|linkedin|x|reddit|canva}/callback`.
 Slack interactivity URL: `{APP_URL}/api/slack/actions` (bot-token mode, signing secret required).
 
+## External access (MCP)
+
+Multicast is also an MCP server at `{APP_URL}/api/mcp` (Streamable HTTP, stateless), so Claude or any MCP client can write, read, approve, publish and schedule posts. It uses the same code paths as the app: only approved posts publish, blocking issues must be fixed first, and platforms without a connected account fall back to reminders.
+
+- **Claude (web, desktop, mobile):** Settings → Connectors → Add custom connector → paste the URL → Connect → sign in to Multicast → **Allow**. This uses OAuth 2.1 with dynamic client registration and PKCE (`/.well-known/oauth-authorization-server`, `/api/mcp-oauth/*`, consent page `/oauth/authorize`). Access tokens last 7 days and refresh tokens 90 days; refreshing rotates both.
+- **Claude Code, scripts, other tools:** create an API key under **Claude API & accounts → External access**, then run `claude mcp add --transport http multicast {APP_URL}/api/mcp --header "Authorization: Bearer mc_key_…"`.
+- Tools: `get_workspace`, `generate_posts`, `create_post`, `list_posts`, `get_post`, `update_post`, `regenerate_post`, `generate_image`, `attach_media`, `approve_post`, `publish_now`, `suggest_times`, `schedule_post`, `list_schedule`, `unschedule_post`, `delete_post`. Times without an offset are read in the workspace time zone.
+- Only SHA-256 hashes of tokens are stored. Revoke keys and connected apps in the same panel; they stop working on the next request.
+
 ## How generation works
 
 For each selected platform, Multicast makes one Claude request, four at a time, streamed to the UI card by card:
@@ -83,6 +92,7 @@ lib/render/*             Satori templates, fonts, layout maths
 lib/publishers/*         Meta (FB + IG), LinkedIn, Reddit, Medium adapters + token refresh
 lib/integrations/*       Canva, Figma, Higgsfield, HeyGen, custom webhook, credential store
 lib/notify/*             Slack (bot / webhook), email, web push
+lib/mcp/*                MCP tools, OAuth metadata and consent checks (endpoint: app/api/mcp)
 lib/schedule/*           time zones, suggestion algorithm, BullMQ queue, scheduling service
 worker/index.ts          BullMQ worker: publish (retries 1/5/15 min), remind, daily reconcile, weekly summary
 ```
@@ -94,6 +104,7 @@ worker/index.ts          BullMQ worker: publish (retries 1/5/15 min), remind, da
 - Mutations require a same-origin request. OAuth `state` (plus PKCE for Canva) is checked, and Slack requests are signature-verified.
 - Uploads are type-checked by content, size-capped (logos ≤ 5 MB), and SVGs are sanitised.
 - Generation endpoints are rate-limited.
+- MCP bearer tokens are stored as SHA-256 hashes only. OAuth codes are single-use, expire after 5 minutes and require PKCE S256; redirect URIs must be registered and are never followed when they don't match. Media URLs given to MCP tools must be public https (private and loopback hosts are refused).
 
 ## Tests
 

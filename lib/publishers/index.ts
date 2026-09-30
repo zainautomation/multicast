@@ -71,3 +71,30 @@ export async function publishDraft(workspaceId: string, draftId: string): Promis
     throw e instanceof PublishError ? e : new PublishError(msg, true);
   }
 }
+
+export type PublishResult = { draftId: string; platform: string; ok: boolean; url?: string; error?: string; skipped?: string };
+
+/** Post now: publish every approved draft in the list that can auto-post. */
+export async function publishMany(workspaceId: string, draftIds: string[]): Promise<PublishResult[]> {
+  const drafts = await db.draft.findMany({ where: { id: { in: draftIds }, workspaceId } });
+  const results: PublishResult[] = [];
+  for (const id of draftIds.filter((id) => !drafts.some((d) => d.id === id))) results.push({ draftId: id, platform: "", ok: false, error: "Draft not found" });
+  for (const d of drafts) {
+    const p = d.platform as PlatformId;
+    if (d.status !== "approved") {
+      results.push({ draftId: d.id, platform: p, ok: false, skipped: d.status === "published" ? "Already published" : "Not approved" });
+      continue;
+    }
+    if (!(await canAuto(workspaceId, p))) {
+      results.push({ draftId: d.id, platform: p, ok: false, skipped: PLATFORMS[p].publish.kind === "copy" ? "Copy mode" : `${PLATFORMS[p].name} is not connected` });
+      continue;
+    }
+    try {
+      const r = await publishDraft(workspaceId, d.id);
+      results.push({ draftId: d.id, platform: p, ok: true, url: r.url });
+    } catch (e) {
+      results.push({ draftId: d.id, platform: p, ok: false, error: errMsg(e) });
+    }
+  }
+  return results;
+}

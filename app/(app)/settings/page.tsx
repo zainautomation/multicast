@@ -3,17 +3,19 @@ import { requireCtx } from "@/lib/auth";
 import { monthSpendMicroUsd } from "@/lib/usage";
 import { CHECKER_MODEL_OPTIONS, DRAFT_MODEL_OPTIONS, modelInfo } from "@/lib/models";
 import { SettingsClient, type AccountRow } from "@/components/settings/SettingsClient";
+import { mcpResource } from "@/lib/mcp/oauth-meta";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const ctx = await requireCtx();
   const sp = await searchParams;
-  const [s, accounts, spend, runs] = await Promise.all([
+  const [s, accounts, spend, runs, tokens] = await Promise.all([
     db.settings.findUniqueOrThrow({ where: { workspaceId: ctx.workspaceId } }),
     db.publishingAccount.findMany({ where: { workspaceId: ctx.workspaceId } }),
     monthSpendMicroUsd(ctx.workspaceId),
     db.usageRecord.count({ where: { workspaceId: ctx.workspaceId, createdAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } } }),
+    db.apiToken.findMany({ where: { workspaceId: ctx.workspaceId }, orderBy: { createdAt: "desc" } }),
   ]);
   const by = Object.fromEntries(accounts.map((a) => [a.platform, a]));
   const env = (k: string) => !!process.env[k];
@@ -93,6 +95,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       draftModels={DRAFT_MODEL_OPTIONS.map((id) => ({ id, label: modelInfo(id).label }))}
       checkerModels={CHECKER_MODEL_OPTIONS.map((id) => ({ id, label: modelInfo(id).label }))}
       accounts={rows}
+      mcp={{
+        url: mcpResource(),
+        tokens: tokens.map((t) => ({ id: t.id, kind: t.kind, name: t.name, hint: t.hint, createdAt: t.createdAt.toISOString(), lastUsedAt: t.lastUsedAt?.toISOString() ?? null })),
+      }}
     />
   );
 }
