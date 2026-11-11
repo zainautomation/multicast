@@ -32,6 +32,8 @@ export type DraftDTO = {
   model: string | null;
   externalUrl: string | null;
   lastError: string | null;
+  /** Account to post as; null = the platform's default account. */
+  accountId: string | null;
   images: ImageDTO[];
   schedule: { id: string; runAtUtc: string; mode: string; status: string; externalUrl: string | null } | null;
 };
@@ -90,6 +92,7 @@ export function draftDTO(d: Draft & { images?: ImageAsset[]; schedule?: Schedule
     model: d.model,
     externalUrl: d.externalUrl,
     lastError: d.lastError,
+    accountId: d.accountId,
     images: (d.images ?? []).sort((a, b) => +a.createdAt - +b.createdAt).map(imageDTO),
     schedule: d.schedule
       ? { id: d.schedule.id, runAtUtc: d.schedule.runAtUtc.toISOString(), mode: d.schedule.mode, status: d.schedule.status, externalUrl: d.schedule.externalUrl }

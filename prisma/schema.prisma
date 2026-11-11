@@ -122,10 +122,13 @@ model PublishingAccount {
   displayName String
   status      String // connected | needs_reconnect
   meta        Json? // page id, ig user id, member urn, org urn, reddit username, medium user id…
+  /// Tells several accounts on one platform apart (LinkedIn profiles: the person URN).
+  /// "" for platforms that hold a single account. The oldest account is the default.
+  accountKey  String    @default("")
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  @@unique([workspaceId, platform])
+  @@unique([workspaceId, platform, accountKey])
 }
 
 model Brief {
@@ -171,6 +174,8 @@ model Draft {
   externalUrl     String?
   publishedAt     DateTime?
   lastError       String?
+  /// PublishingAccount to post as; null = the platform's default account.
+  accountId       String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   brief           Brief         @relation(fields: [briefId], references: [id], onDelete: Cascade)

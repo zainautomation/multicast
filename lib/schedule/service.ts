@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { HttpError } from "@/lib/errors";
 import { PLATFORMS, type PlatformId } from "@/lib/platforms";
-import { canAuto } from "@/lib/publishers";
+import { canAuto, notConnectedReason } from "@/lib/publishers";
 import { enqueuePublish, enqueueRemind, removeJob, schedulerAvailable } from "@/lib/schedule/queue";
 import { reminderTime, suggestMany, type Window } from "@/lib/schedule/suggest";
 import { isValidTz } from "@/lib/schedule/time";
@@ -12,10 +12,10 @@ export async function workspaceTz(workspaceId: string): Promise<string> {
 }
 
 /** Quora is always Remind me; Medium unless a token is stored; others need a linked account. */
-export async function effectiveMode(workspaceId: string, platform: PlatformId, requested: "auto" | "remind") {
+export async function effectiveMode(workspaceId: string, platform: PlatformId, requested: "auto" | "remind", accountId?: string | null) {
   if (requested === "remind") return { mode: "remind" as const, forced: false };
   if (PLATFORMS[platform].publish.kind === "copy") return { mode: "remind" as const, forced: true, reason: `${PLATFORMS[platform].name} has no posting API` };
-  if (!(await canAuto(workspaceId, platform))) return { mode: "remind" as const, forced: true, reason: `${PLATFORMS[platform].name} is not connected` };
+  if (!(await canAuto(workspaceId, platform, accountId))) return { mode: "remind" as const, forced: true, reason: notConnectedReason(platform, accountId) };
   return { mode: "auto" as const, forced: false };
 }
 
@@ -33,7 +33,7 @@ export async function scheduleDraft(workspaceId: string, draftId: string, runAtU
   if (!["approved", "scheduled"].includes(d.status)) throw new HttpError(400, "Approve the draft before scheduling it");
   if (runAtUtc.getTime() < Date.now() - 60_000) throw new HttpError(400, "That time is in the past");
   if (!schedulerAvailable()) throw new HttpError(503, "Scheduling is not set up: connect Upstash QStash (QSTASH_TOKEN), or set REDIS_URL and run the worker. Post now still works.");
-  const { mode } = await effectiveMode(workspaceId, d.platform as PlatformId, requestedMode);
+  const { mode } = await effectiveMode(workspaceId, d.platform as PlatformId, requestedMode, d.accountId);
 
   if (d.schedule) {
     await removeJob(d.schedule.jobId);

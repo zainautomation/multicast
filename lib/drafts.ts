@@ -88,6 +88,21 @@ export async function editDraft(workspaceId: string, id: string, e: DraftEdit) {
   return loadDraftDTO(id);
 }
 
+/**
+ * Choose which connected account a draft posts as (null = the platform's default). The text
+ * is unchanged, so approval stands; scheduled and published posts are locked.
+ */
+export async function setDraftAccount(workspaceId: string, id: string, accountId: string | null) {
+  const d = await ownedDraft(workspaceId, id);
+  if (["scheduled", "published"].includes(d.status)) throw new HttpError(400, d.status === "scheduled" ? "Unschedule this post before changing the account." : "This post is already live.");
+  if (accountId) {
+    const acc = await db.publishingAccount.findFirst({ where: { id: accountId, workspaceId, platform: d.platform }, select: { id: true } });
+    if (!acc) throw new HttpError(404, "That account isn't connected for this platform");
+  }
+  await db.draft.update({ where: { id }, data: { accountId } });
+  return loadDraftDTO(id);
+}
+
 export async function deleteDraft(workspaceId: string, id: string) {
   const d = await ownedDraft(workspaceId, id);
   if (d.schedule && d.schedule.status === "pending") throw new HttpError(400, "Unschedule this post first.");

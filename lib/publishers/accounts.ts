@@ -13,17 +13,35 @@ export class ReconnectError extends Error {
   }
 }
 
-export async function getAccount(workspaceId: string, platform: PlatformId): Promise<Account | null> {
-  const row = await db.publishingAccount.findUnique({ where: { workspaceId_platform: { workspaceId, platform } } });
-  if (!row) return null;
-  return { row, tokens: decryptJson<Tokens>(row.tokensEnc), meta: (row.meta ?? {}) as Record<string, unknown> };
+const toAccount = (row: PublishingAccount): Account => ({ row, tokens: decryptJson<Tokens>(row.tokensEnc), meta: (row.meta ?? {}) as Record<string, unknown> });
+
+/**
+ * The account to post as on a platform. With an id, that exact account (null if it was
+ * disconnected, so a post never silently goes out as someone else); without one, the
+ * platform's default account, which is the oldest one connected.
+ */
+export async function getAccount(workspaceId: string, platform: PlatformId, accountId?: string | null): Promise<Account | null> {
+  const row = accountId
+    ? await db.publishingAccount.findFirst({ where: { id: accountId, workspaceId, platform } })
+    : await db.publishingAccount.findFirst({ where: { workspaceId, platform }, orderBy: { createdAt: "asc" } });
+  return row ? toAccount(row) : null;
 }
 
+/** All accounts on a platform, default first. */
+export async function listAccounts(workspaceId: string, platform: PlatformId) {
+  return db.publishingAccount.findMany({ where: { workspaceId, platform }, orderBy: { createdAt: "asc" } });
+}
+
+/**
+ * Create or update an account. `accountKey` identifies the person/page on platforms that
+ * can hold several accounts (LinkedIn profiles); omit it for single-account platforms.
+ */
 export async function saveAccount(
   workspaceId: string,
   platform: PlatformId,
-  a: { tokens: Tokens; displayName: string; expiresAt?: Date | null; meta?: Record<string, unknown> },
+  a: { tokens: Tokens; displayName: string; expiresAt?: Date | null; meta?: Record<string, unknown>; accountKey?: string },
 ) {
+  const accountKey = a.accountKey ?? "";
   const data = {
     tokensEnc: encryptJson(a.tokens),
     displayName: a.displayName,
@@ -32,19 +50,19 @@ export async function saveAccount(
     meta: (a.meta ?? {}) as object,
   };
   return db.publishingAccount.upsert({
-    where: { workspaceId_platform: { workspaceId, platform } },
-    create: { workspaceId, platform, ...data },
+    where: { workspaceId_platform_accountKey: { workspaceId, platform, accountKey } },
+    create: { workspaceId, platform, accountKey, ...data },
     update: data,
   });
 }
 
-export async function markNeedsReconnect(workspaceId: string, platform: PlatformId, reason: string) {
-  await db.publishingAccount.updateMany({ where: { workspaceId, platform }, data: { status: "needs_reconnect" } });
+export async function markNeedsReconnect(a: Account, reason: string) {
+  await db.publishingAccount.update({ where: { id: a.row.id }, data: { status: "needs_reconnect" } });
   const { notify } = await import("@/lib/notify");
-  await notify(workspaceId, "failed", { title: `${platform} needs reconnecting`, error: reason }).catch(() => undefined);
+  await notify(a.row.workspaceId, "failed", { title: `${a.row.platform} (${a.row.displayName}) needs reconnecting`, error: reason }).catch(() => undefined);
 }
 
-async function refreshReddit(workspaceId: string, a: Account): Promise<string> {
+async function refreshReddit(a: Account): Promise<string> {
   if (!a.tokens.refreshToken) throw new ReconnectError("reddit", "Reddit session expired; reconnect Reddit");
   const res = await fetch("https://www.reddit.com/api/v1/access_token", {
     method: "POST",
@@ -65,22 +83,27 @@ async function refreshReddit(workspaceId: string, a: Account): Promise<string> {
 }
 
 /**
- * A valid access token for a platform, refreshed if needed (spec §10: refresh before each
+ * A valid access token for an account, refreshed if needed (spec §10: refresh before each
  * publish). Expired/revoked tokens mark the account "Needs reconnect" and alert.
  */
-export async function accountToken(workspaceId: string, platform: PlatformId): Promise<string | null> {
-  const a = await getAccount(workspaceId, platform);
-  if (!a) return null;
+export async function tokenFor(a: Account): Promise<string> {
+  const platform = a.row.platform as PlatformId;
   try {
     if (a.row.status === "needs_reconnect") throw new ReconnectError(platform, `${a.row.displayName} needs reconnecting`);
     const expSoon = a.row.expiresAt && a.row.expiresAt.getTime() < Date.now() + 60_000;
     if (!expSoon) return a.tokens.accessToken;
-    if (platform === "reddit") return await refreshReddit(workspaceId, a);
+    if (platform === "reddit") return await refreshReddit(a);
     // LinkedIn member tokens last ~60 days and refresh tokens are partner-only; Meta page
     // tokens derived from a long-lived user token do not expire.
-    throw new ReconnectError(platform, "Access token expired; reconnect the account");
+    throw new ReconnectError(platform, `Access token for ${a.row.displayName} expired; reconnect the account`);
   } catch (e) {
-    if (e instanceof ReconnectError && a.row.status !== "needs_reconnect") await markNeedsReconnect(workspaceId, platform, e.message);
+    if (e instanceof ReconnectError && a.row.status !== "needs_reconnect") await markNeedsReconnect(a, e.message);
     throw e;
   }
+}
+
+/** Token for the platform's default account (or a given one); null when none is connected. */
+export async function accountToken(workspaceId: string, platform: PlatformId, accountId?: string | null): Promise<string | null> {
+  const a = await getAccount(workspaceId, platform, accountId);
+  return a ? tokenFor(a) : null;
 }

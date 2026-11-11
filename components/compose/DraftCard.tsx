@@ -193,6 +193,27 @@ export function DraftCard({
             {tile.mode}
             {!tile.auto && !tile.copyMode ? " · connect to auto-post" : ""}
           </span>
+          {tile.accounts.length > 1 && d.hasPost ? (
+            <label className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+              Post as
+              <select
+                className="min-h-7 max-w-[220px] rounded-md border border-input bg-surface px-1.5 text-xs text-ink disabled:opacity-60"
+                value={!d.accountId || d.accountId === tile.accounts[0].id ? "" : d.accountId}
+                disabled={locked || generating || busy === "account"}
+                title={locked ? "Unschedule this post to change the account" : undefined}
+                onChange={(e) => call("account", `/api/drafts/${d.id}`, { accountId: e.target.value || null }, "PATCH")}
+              >
+                <option value="">{tile.accounts[0].name} (default)</option>
+                {tile.accounts.slice(1).map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                    {a.ok ? "" : " · needs reconnect"}
+                  </option>
+                ))}
+                {d.accountId && !tile.accounts.some((a) => a.id === d.accountId) ? <option value={d.accountId}>Disconnected account</option> : null}
+              </select>
+            </label>
+          ) : null}
         </div>
         <span className={cx("whitespace-nowrap rounded-md bg-bg px-2 py-1 font-mono text-xs", over ? "text-danger" : "text-muted")} aria-label={over ? "Over the character limit" : undefined}>
           {!d.hasPost ? "Image" : counter}

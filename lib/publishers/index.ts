@@ -7,7 +7,7 @@ import { linkedinCompanyPublisher, linkedinProfilePublisher } from "@/lib/publis
 import { redditPublisher } from "@/lib/publishers/reddit";
 import { mediumPublisher } from "@/lib/publishers/medium";
 import { xPublisher } from "@/lib/publishers/x";
-import { accountToken, getAccount } from "@/lib/publishers/accounts";
+import { getAccount, tokenFor } from "@/lib/publishers/accounts";
 import { PublishError, type Publisher } from "@/lib/publishers/types";
 import { splitWarnings } from "@/lib/dto";
 import { notify } from "@/lib/notify";
@@ -28,12 +28,20 @@ export function publisherFor(p: PlatformId): Publisher | null {
   return PUBLISHERS[p] ?? null;
 }
 
-/** Whether this draft's platform can post automatically right now. */
-export async function canAuto(workspaceId: string, platform: PlatformId): Promise<boolean> {
+/**
+ * Whether a platform can post automatically right now: as the draft's chosen account when
+ * `accountId` is given, otherwise as the platform's default account.
+ */
+export async function canAuto(workspaceId: string, platform: PlatformId, accountId?: string | null): Promise<boolean> {
   const pub = publisherFor(platform);
   if (!pub || PLATFORMS[platform].publish.kind === "copy") return false;
   if (platform === "lic" && process.env.LINKEDIN_COMPANY_ENABLED !== "true") return false;
-  return pub.canAutoPublish(await getAccount(workspaceId, platform));
+  return pub.canAutoPublish(await getAccount(workspaceId, platform, accountId));
+}
+
+/** Why a draft can't auto-post, for skip messages. */
+export function notConnectedReason(platform: PlatformId, accountId?: string | null) {
+  return accountId ? `The ${PLATFORMS[platform].name} account chosen for this post is disconnected or needs reconnecting` : `${PLATFORMS[platform].name} is not connected`;
 }
 
 type DraftFull = Draft & { images: ImageAsset[]; brief: { subreddit: string | null } };
@@ -50,11 +58,17 @@ export async function publishDraft(workspaceId: string, draftId: string): Promis
   const pre = pub.validate(d, images);
   if (pre.length) throw new PublishError(pre.join("; "), false);
 
-  const account = await getAccount(workspaceId, platform);
-  if (!account) throw new PublishError(`Connect ${PLATFORMS[platform].name} in Claude API & accounts first`, false);
-  let token: string | null;
+  // A post tied to an account that has since been disconnected fails rather than going out
+  // as the default account: posting as the wrong person can't be undone.
+  const account = await getAccount(workspaceId, platform, d.accountId);
+  if (!account)
+    throw new PublishError(
+      d.accountId ? `The ${PLATFORMS[platform].name} account chosen for this post was disconnected. Pick another under "Post as".` : `Connect ${PLATFORMS[platform].name} in Claude API & accounts first`,
+      false,
+    );
+  let token: string;
   try {
-    token = await accountToken(workspaceId, platform);
+    token = await tokenFor(account);
   } catch (e) {
     throw new PublishError(errMsg(e), false);
   }
@@ -85,8 +99,8 @@ export async function publishMany(workspaceId: string, draftIds: string[]): Prom
       results.push({ draftId: d.id, platform: p, ok: false, skipped: d.status === "published" ? "Already published" : "Not approved" });
       continue;
     }
-    if (!(await canAuto(workspaceId, p))) {
-      results.push({ draftId: d.id, platform: p, ok: false, skipped: PLATFORMS[p].publish.kind === "copy" ? "Copy mode" : `${PLATFORMS[p].name} is not connected` });
+    if (!(await canAuto(workspaceId, p, d.accountId))) {
+      results.push({ draftId: d.id, platform: p, ok: false, skipped: PLATFORMS[p].publish.kind === "copy" ? "Copy mode" : notConnectedReason(p, d.accountId) });
       continue;
     }
     try {

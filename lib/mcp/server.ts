@@ -6,7 +6,7 @@ import { HttpError } from "@/lib/errors";
 import { PLATFORM_IDS, PLATFORMS, type PlatformId } from "@/lib/platforms";
 import { GOALS, TONES } from "@/lib/prompts/assemble";
 import { draftDTO, type DraftDTO } from "@/lib/dto";
-import { approveDraft, attachMedia, deleteDraft, editDraft, loadDraftDTO, ownedDraft } from "@/lib/drafts";
+import { approveDraft, attachMedia, deleteDraft, editDraft, loadDraftDTO, ownedDraft, setDraftAccount } from "@/lib/drafts";
 import { createBrief, createManualDraft } from "@/lib/briefs";
 import { regenerateImage, regenerateText, runBrief } from "@/lib/generation/run";
 import { canAuto, publishMany } from "@/lib/publishers";
@@ -36,6 +36,7 @@ function post(d: DraftDTO) {
     body: d.body,
     ...(d.firstComment ? { first_comment: d.firstComment } : {}),
     hashtags: d.hashtags,
+    ...(d.accountId ? { account_id: d.accountId } : {}),
     ...(d.warnings.length ? { blocking_issues: d.warnings } : {}),
     ...(d.notes.length ? { notes: d.notes } : {}),
     media: d.images.map((i) => ({ id: i.id, status: i.status, type: i.mimeType, size: `${i.width}x${i.height}`, urls: i.urls })),
@@ -91,16 +92,26 @@ export function buildMcpServer(workspaceId: string) {
     "get_workspace",
     {
       title: "Workspace and platforms",
-      description: "Time zone, whether Claude drafting and scheduling are set up, and for each platform: whether it can auto-post now (account connected) or only copy/remind.",
+      description:
+        "Time zone, whether Claude drafting and scheduling are set up, and for each platform: whether it can auto-post now (account connected) or only copy/remind. Platforms with several connected accounts (e.g. teammates' LinkedIn profiles) list them; pass account_id to update_post to post as one.",
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
     wrap(async () => {
       const [tz, settings] = await Promise.all([workspaceTz(workspaceId), db.settings.findUnique({ where: { workspaceId }, select: { claudeKeyEnc: true } })]);
+      const accounts = await db.publishingAccount.findMany({ where: { workspaceId }, orderBy: { createdAt: "asc" }, select: { id: true, platform: true, displayName: true, status: true } });
       const platforms = [];
       for (const id of PLATFORM_IDS) {
         const p = PLATFORMS[id];
-        platforms.push({ id, name: p.name, auto_post: await canAuto(workspaceId, id), publish: p.publish.label, text_limit: p.textLimit || null });
+        const mine = accounts.filter((x) => x.platform === id);
+        platforms.push({
+          id,
+          name: p.name,
+          auto_post: await canAuto(workspaceId, id),
+          publish: p.publish.label,
+          text_limit: p.textLimit || null,
+          ...(mine.length > 1 ? { accounts: mine.map((x, i) => ({ id: x.id, name: x.displayName, default: i === 0, connected: x.status === "connected" })) } : {}),
+        });
       }
       return { time_zone: tz, claude_connected: !!settings?.claudeKeyEnc, scheduling_available: schedulerAvailable(), goals: GOALS, tones: TONES, platforms };
     }),
@@ -213,7 +224,8 @@ export function buildMcpServer(workspaceId: string) {
     "update_post",
     {
       title: "Edit a post",
-      description: "Change a post's text fields. Checks re-run; an approved post goes back to needing approval. Scheduled posts must be unscheduled first.",
+      description:
+        "Change a post's text fields, or which account it posts as. Text edits re-run checks and send an approved post back for approval; changing only account_id keeps approval. Scheduled posts must be unscheduled first.",
       inputSchema: {
         id: z.string(),
         body: z.string().max(100_000).optional(),
@@ -223,10 +235,16 @@ export function buildMcpServer(workspaceId: string) {
         hashtags: z.array(z.string().max(100)).max(30).optional(),
         first_comment: z.string().max(3000).nullable().optional(),
         use_alternative: z.number().int().min(0).max(2).optional().describe("Swap in alternative N from get_post instead of editing"),
+        account_id: z.string().max(64).nullable().optional().describe("Post as this account (from get_workspace platform accounts); null = the platform's default"),
       },
     },
-    wrap(async (a: { id: string; body?: string; title?: string | null; subtitle?: string | null; slug?: string | null; hashtags?: string[]; first_comment?: string | null; use_alternative?: number }) =>
-      ({ post: post(await editDraft(workspaceId, a.id, { body: a.body, title: a.title, subtitle: a.subtitle, slug: a.slug, hashtags: a.hashtags, firstComment: a.first_comment, useVariant: a.use_alternative })) }),
+    wrap(
+      async (a: { id: string; body?: string; title?: string | null; subtitle?: string | null; slug?: string | null; hashtags?: string[]; first_comment?: string | null; use_alternative?: number; account_id?: string | null }) => {
+        if (a.account_id !== undefined) await setDraftAccount(workspaceId, a.id, a.account_id);
+        const e = { body: a.body, title: a.title, subtitle: a.subtitle, slug: a.slug, hashtags: a.hashtags, firstComment: a.first_comment, useVariant: a.use_alternative };
+        if (Object.values(e).some((v) => v !== undefined)) return { post: post(await editDraft(workspaceId, a.id, e)) };
+        return { post: post(await loadDraftDTO((await ownedDraft(workspaceId, a.id)).id)) };
+      },
     ),
   );
 

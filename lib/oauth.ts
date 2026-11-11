@@ -5,7 +5,7 @@ import { decrypt, decryptJson, encrypt } from "@/lib/crypto";
 import { authHeader, xKeys } from "@/lib/oauth1";
 import { HttpError } from "@/lib/errors";
 import { GRAPH } from "@/lib/publishers/meta";
-import { saveAccount } from "@/lib/publishers/accounts";
+import { getAccount, saveAccount } from "@/lib/publishers/accounts";
 import { liHeaders } from "@/lib/publishers/linkedin";
 import { saveIntegration } from "@/lib/integrations/store";
 import { appUrl } from "@/lib/env";
@@ -161,8 +161,15 @@ export async function finish(p: Provider, workspaceId: string, code: string, sta
       const expiresAt = new Date(Date.now() + (t.expires_in ?? 5_184_000) * 1000);
       const me = await j(await fetch("https://api.linkedin.com/v2/userinfo", { headers: { Authorization: `Bearer ${t.access_token}` } }), "LinkedIn profile");
       const tokens = { accessToken: t.access_token, refreshToken: t.refresh_token, scope: t.scope };
-      await saveAccount(workspaceId, "lip", { tokens, expiresAt, displayName: me.name ?? "LinkedIn member", meta: { personUrn: `urn:li:person:${me.sub}` } });
-      if (process.env.LINKEDIN_COMPANY_ENABLED === "true") {
+      // Each person who signs in is a separate profile (keyed by URN), so teammates can be
+      // added alongside the owner; signing in again as the same person refreshes their row.
+      const personUrn = `urn:li:person:${me.sub}`;
+      await saveAccount(workspaceId, "lip", { tokens, expiresAt, displayName: me.name ?? "LinkedIn member", meta: { personUrn }, accountKey: personUrn });
+      // The company page posts with the token of whoever linked it. Only the default
+      // (first) profile replaces it, so adding a teammate never re-points the page.
+      const [primary, page] = await Promise.all([getAccount(workspaceId, "lip"), getAccount(workspaceId, "lic")]);
+      const mayLinkPage = !page || primary?.row.accountKey === personUrn;
+      if (process.env.LINKEDIN_COMPANY_ENABLED === "true" && mayLinkPage) {
         const acl = await fetch(`https://api.linkedin.com/rest/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED`, { headers: liHeaders(t.access_token) })
           .then((r) => (r.ok ? r.json() : { elements: [] }))
           .catch(() => ({ elements: [] }));
@@ -172,7 +179,7 @@ export async function finish(p: Provider, workspaceId: string, code: string, sta
           const org: { localizedName?: string } = await fetch(`https://api.linkedin.com/rest/organizations/${orgId}`, { headers: liHeaders(t.access_token) })
             .then((r) => (r.ok ? r.json() : {}))
             .catch(() => ({}));
-          await saveAccount(workspaceId, "lic", { tokens, expiresAt, displayName: org.localizedName ?? "Company page", meta: { orgUrn, orgs: acl.elements.map((e: { organization: string }) => e.organization) } });
+          await saveAccount(workspaceId, "lic", { tokens, expiresAt, displayName: org.localizedName ?? "Company page", meta: { orgUrn, orgs: acl.elements.map((e: { organization: string }) => e.organization), linkedBy: personUrn } });
         }
       }
       return;

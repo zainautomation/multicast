@@ -48,7 +48,7 @@ async function handle(workspaceId: string, p: Payload) {
         const v = await revalidate(workspaceId, d.id);
         if (v.errors.length) return reply(p.response_url, `${name} draft needs edits before it can post: ${v.errors.join(" ")}`);
         await db.draft.update({ where: { id: d.id }, data: { status: "approved", warnings: packWarnings(v.errors, v.notes) } });
-        if (!(await canAuto(workspaceId, d.platform as PlatformId))) return reply(p.response_url, `${name} draft approved${who}. It can't auto-post; schedule it with a reminder in Multicast.`);
+        if (!(await canAuto(workspaceId, d.platform as PlatformId, d.accountId))) return reply(p.response_url, `${name} draft approved${who}. It can't auto-post; schedule it with a reminder in Multicast.`);
         const r = await publishDraft(workspaceId, d.id);
         return reply(p.response_url, `${name} post is live${who}: ${r.url}`);
       }

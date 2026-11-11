@@ -16,6 +16,8 @@ export type AccountRow = {
   setupHint?: string;
   expires?: string | null;
   pages?: { id: string; name: string; ig: string | null; current: boolean }[];
+  /** LinkedIn: every connected profile, default first. */
+  profiles?: { id: string; name: string; status: "connected" | "reconnect"; expires: string | null; isDefault: boolean }[];
 };
 
 type Claude = {
@@ -113,6 +115,20 @@ export function SettingsClient({
     try {
       await api(`/api/accounts/${id}`, { method: "DELETE" });
       router.refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function removeProfile(id: string, name: string) {
+    if (!confirm(`Remove ${name}'s LinkedIn profile? Posts set to go out as ${name} will fail until you pick another account for them.`)) return;
+    setBusy(`profile-${id}`);
+    try {
+      const r = await api<{ removedPage?: boolean }>(`/api/accounts/linkedin?account=${encodeURIComponent(id)}`, { method: "DELETE" });
+      toast(r.removedPage ? `${name} removed, with the company page they linked. Reconnect as a page admin to link it again.` : `${name} removed`, "ok");
+      router.refresh();
+    } catch (e) {
+      toast((e as Error).message, "error");
     } finally {
       setBusy(null);
     }
@@ -254,7 +270,7 @@ export function SettingsClient({
                     <span className="text-[12.5px] text-caption">{a.detail}</span>
                   </div>
                   <Pill kind={s.kind}>{s.label}</Pill>
-                  {a.kind === "oauth" && (a.status === "none" || a.status === "reconnect") ? (
+                  {a.kind === "oauth" && (a.status === "none" || (a.status === "reconnect" && !a.profiles?.length)) ? (
                     <a href={`/api/oauth/${a.id}/start`} className="inline-flex min-h-10 min-w-[104px] items-center justify-center rounded-[9px] border border-input bg-surface px-3.5 text-[13px] !text-ink no-underline hover:bg-surface-muted">
                       {action}
                     </a>
@@ -300,8 +316,38 @@ export function SettingsClient({
                         )}
                       </Field>
                     ) : null}
+                    {a.id === "linkedin" && a.profiles?.length ? (
+                      <div className="flex flex-col gap-2">
+                        <span className="font-semibold text-ink">Profiles</span>
+                        {a.profiles.map((p) => (
+                          <div key={p.id} className="flex flex-wrap items-center gap-2.5 rounded-lg bg-surface px-3 py-2">
+                            <div className="flex min-w-0 flex-1 flex-col">
+                              <span className="text-[13.5px] text-ink">
+                                {p.name}
+                                {p.isDefault ? <span className="text-caption"> · default</span> : null}
+                              </span>
+                              {p.expires ? <span className="text-[12px] text-caption">Access expires {new Date(p.expires).toLocaleDateString()}</span> : null}
+                            </div>
+                            <Pill kind={p.status === "connected" ? "ok" : "danger"}>{p.status === "connected" ? "Connected" : "Needs reconnect"}</Pill>
+                            {a.profiles!.length > 1 ? (
+                              <Button size="sm" variant="danger" onClick={() => removeProfile(p.id, p.name)} busy={busy === `profile-${p.id}`}>
+                                Remove
+                              </Button>
+                            ) : null}
+                          </div>
+                        ))}
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <a href="/api/oauth/linkedin/start" className="inline-flex min-h-10 items-center rounded-[9px] border border-input bg-surface px-3.5 text-[13px] !text-ink no-underline hover:bg-surface-muted">
+                            Add another profile
+                          </a>
+                          <span className="text-[12.5px] leading-normal">
+                            Your teammate signs in to LinkedIn and approves. LinkedIn uses whoever is signed in to linkedin.com in this browser, so sign out of LinkedIn first or use a private window. To reconnect a profile, sign in as that person.
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
                     {a.expires ? <span>Access expires {new Date(a.expires).toLocaleDateString()}. Reconnect before then to keep auto-posting.</span> : null}
-                    {a.status === "connected" ? (
+                    {a.status === "connected" || a.profiles?.length ? (
                       <div className="flex gap-2">
                         {a.kind === "oauth" ? (
                           <a href={`/api/oauth/${a.id}/start`} className="inline-flex min-h-10 items-center rounded-[9px] border border-input bg-surface px-3.5 text-[13px] !text-ink no-underline">
@@ -309,7 +355,7 @@ export function SettingsClient({
                           </a>
                         ) : null}
                         <Button size="sm" variant="danger" onClick={() => disconnect(a.id)} busy={busy === a.id}>
-                          Disconnect
+                          {a.id === "linkedin" && (a.profiles?.length ?? 0) > 1 ? "Disconnect all" : "Disconnect"}
                         </Button>
                       </div>
                     ) : null}

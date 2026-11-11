@@ -17,7 +17,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     db.usageRecord.count({ where: { workspaceId: ctx.workspaceId, createdAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) } } }),
     db.apiToken.findMany({ where: { workspaceId: ctx.workspaceId }, orderBy: { createdAt: "desc" } }),
   ]);
-  const by = Object.fromEntries(accounts.map((a) => [a.platform, a]));
+  accounts.sort((a, b) => +a.createdAt - +b.createdAt);
+  // First (oldest) account per platform is the default one.
+  const by: Record<string, (typeof accounts)[number]> = {};
+  for (const a of accounts) by[a.platform] ??= a;
+  const profiles = accounts.filter((a) => a.platform === "lip");
   const env = (k: string) => !!process.env[k];
   const st = (a?: (typeof accounts)[number]) => (!a ? null : a.status === "connected" ? "connected" : "reconnect");
 
@@ -39,12 +43,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       mono: "in",
       color: "#1D5C8C",
       detail: by.lip
-        ? `Profile: ${by.lip.displayName}${by.lic ? ` · Company page: ${by.lic.displayName}` : process.env.LINKEDIN_COMPANY_ENABLED === "true" ? " · no company page (you must be a page admin)" : " · company pages need Community Management API approval"}`
+        ? `${profiles.length > 1 ? `Profiles: ${profiles.map((p) => p.displayName).join(", ")}` : `Profile: ${by.lip.displayName}`}${by.lic ? ` · Company page: ${by.lic.displayName}` : process.env.LINKEDIN_COMPANY_ENABLED === "true" ? " · no company page (you must be a page admin)" : " · company pages need Community Management API approval"}`
         : "Personal profile, plus company page once your app is approved",
-      status: st(by.lip) ?? (env("LINKEDIN_CLIENT_ID") ? "none" : "setup"),
+      status: profiles.some((p) => p.status !== "connected") ? "reconnect" : st(by.lip) ?? (env("LINKEDIN_CLIENT_ID") ? "none" : "setup"),
       kind: "oauth",
       setupHint: "Set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET in .env",
-      expires: by.lip?.expiresAt?.toISOString() ?? null,
+      profiles: profiles.map((p, i) => ({ id: p.id, name: p.displayName, status: p.status === "connected" ? "connected" : "reconnect", expires: p.expiresAt?.toISOString() ?? null, isDefault: i === 0 })),
     },
     {
       id: "x",

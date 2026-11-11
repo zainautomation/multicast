@@ -29,6 +29,8 @@ export type PlatformTile = {
   auto: boolean;
   copyMode: boolean;
   firstComment: boolean;
+  /** Connected accounts to post as, default first (more than one = show "Post as"). */
+  accounts: { id: string; name: string; ok: boolean }[];
 };
 
 type BriefLite = { id: string; text: string; goal: string; tone: string; subreddit: string | null; keyword?: string | null; postPlatforms: string[]; imagePlatforms: string[]; createdAt: string };

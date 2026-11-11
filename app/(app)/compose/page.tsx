@@ -13,10 +13,11 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
   const ctx = await requireCtx();
   const sp = await searchParams;
   const ws = ctx.workspaceId;
-  const [settings, connected, layers, brief] = await Promise.all([
+  const [settings, connected, layers, accountRows, brief] = await Promise.all([
     db.settings.findUniqueOrThrow({ where: { workspaceId: ws } }),
     connectedTypes(ws),
     getLayers(ws),
+    db.publishingAccount.findMany({ where: { workspaceId: ws }, orderBy: { createdAt: "asc" }, select: { id: true, platform: true, displayName: true, status: true } }),
     sp.brief
       ? db.brief.findFirst({ where: { id: sp.brief, workspaceId: ws }, include: { drafts: { include: { images: true, schedule: true }, orderBy: { createdAt: "asc" } } } })
       : db.brief.findFirst({ where: { workspaceId: ws }, orderBy: { createdAt: "desc" }, include: { drafts: { include: { images: true, schedule: true }, orderBy: { createdAt: "asc" } } } }),
@@ -43,6 +44,7 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
       auto: await canAuto(ws, p.id),
       copyMode: p.publish.kind === "copy" || (p.publish.kind === "token-draft" && !(await canAuto(ws, p.id))),
       firstComment: layers[p.id as PlatformId]?.rules.cta === "First comment",
+      accounts: accountRows.filter((a) => a.platform === p.id).map((a) => ({ id: a.id, name: a.displayName, ok: a.status === "connected" })),
     })),
   );
 
